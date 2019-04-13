@@ -27,22 +27,23 @@ def get_matches():
 def get_match_stats(matchID):
     header = {"accept" : "application/vnd.api+json"}
     apireq = requests.get("https://api.pubg.com/shards/steam/matches/%s" % matchID, headers=header)
-    print(apireq)
 
+    # API response is structured: { data : {...}
+    #                               included: [...] }
+    # where data has information about the IDs of the match objects (players, rosters, etc) and
+    # included contains links to the actual objects about the match (look up by ID from data)
 
+    # get the data
     match_df = pd.DataFrame(apireq.json()['data'])
+
+    # Get the id of the telemetry object to look up in the included array
+    assets = pd.DataFrame(match_df.loc['assets', 'relationships'])['data'].apply(pd.Series)
+    telemetry_id = assets[assets.type == "asset"]['id'].values[0]
+
+    # Get the telemetry object from the included array
     match_data = pd.DataFrame(apireq.json()['included'])
-    assets = pd.DataFrame(match_df.loc['assets', 'relationships'])
-    rosters = pd.DataFrame(match_df.loc['rosters', 'relationships'])
-    #print(match_df.to_string())
-    #print(assets['data'].apply(pd.Series).head().to_string())
-    #print(rosters['data'].apply(pd.Series).head().to_string())
-    print(match_data.head(), match_data.shape)
-    #print(pd.DataFrame(norm).to_string())
+    telemetry_object = match_data[match_data.id == telemetry_id]
 
-    return
+    # Return the url of the telemetry object
+    return telemetry_object['attributes'].apply(pd.Series)['URL']
 
-
-if __name__ == "__main__":
-    ids = get_matches()
-    get_match_stats(ids[0])
