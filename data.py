@@ -1,8 +1,12 @@
 import pandas as pd
 from pandas.io.json import json_normalize
 import requests
+import gzip 
+import shutil
+import os 
 
 apikey = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyY2IxM2ZhMC0zYzQ1LTAxMzctODYwNC0wMWI0YTFkMWRiOWEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU0NzM5MTUxLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii02MTA3ZjhlYS1kZjNlLTQzYTctYTU5Ni1hMzljYTY5NDQ2NzUifQ.Aqxif7hL74A6LxrnpO7LNZYMCACAf4HHYTatEs3UWYs"
+
 
 # Get a list of random match IDs from the PUBG API
 def get_matches():
@@ -47,3 +51,31 @@ def get_match_stats(matchID):
     # Return the url of the telemetry object
     return telemetry_object['attributes'].apply(pd.Series)['URL']
 
+
+# Given location of gzips and location of where to extract to -> unzips gzip files
+def extract_gzip(gzip_indir, gzip_outdir): 
+    
+    # Check if directories exist
+    if not os.path.isdir(gzip_indir): 
+        print("Cannot find directory '" + gzip_indir + "'")
+        exit()
+    elif not os.path.isdir(gzip_outdir):
+        print("Cannot find directory '" + gzip_outdir + "'")
+        exit()
+
+    # Get name of all files to unzip
+    files = os.listdir(gzip_indir)
+    for f in files: 
+        outfile  = f.replace(".gz", "")
+        try: 
+            with gzip.open(gzip_indir + f, 'rb') as g:
+                print("Copying '" + f + "'")
+
+                # Copy files to output directory
+                with open(gzip_outdir + outfile, 'wb') as g_copy: 
+                    shutil.copyfileobj(g, g_copy)
+
+        except: 
+            print("Unable to copy file '" + gzip_indir + f + "'\n")
+
+    print("Copying data - done")
