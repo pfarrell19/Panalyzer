@@ -55,6 +55,7 @@ def get_match_stats(matchID):
 # Given location of gzips and location of where to extract to -> unzips gzip files
 def extract_gzip(gzip_indir, gzip_outdir): 
     
+    # Check if directories exist
     if not os.path.isdir(gzip_indir): 
         print("Cannot find directory '" + gzip_indir + "'")
         exit()
@@ -62,12 +63,15 @@ def extract_gzip(gzip_indir, gzip_outdir):
         print("Cannot find directory '" + gzip_outdir + "'")
         exit()
 
+    # Get name of all files to unzip
     files = os.listdir(gzip_indir)
     for f in files: 
         outfile  = f.replace(".gz", "")
         try: 
             with gzip.open(gzip_indir + f, 'rb') as g:
                 print("Copying '" + f + "'")
+
+                # Copy files to output directory
                 with open(gzip_outdir + outfile, 'wb') as g_copy: 
                     shutil.copyfileobj(g, g_copy)
 
