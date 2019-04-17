@@ -5,20 +5,47 @@ import gzip
 import shutil
 import os 
 
-apikey = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyY2IxM2ZhMC0zYzQ1LTAxMzctODYwNC0wMWI0YTFkMWRiOWEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU0NzM5MTUxLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii02MTA3ZjhlYS1kZjNlLTQzYTctYTU5Ni1hMzljYTY5NDQ2NzUifQ.Aqxif7hL74A6LxrnpO7LNZYMCACAf4HHYTatEs3UWYs"
+def main():
+    # Check API key
+    api_keys = ["eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyZmZlNTYxMC0zYTAxLTAxMzctOWEwNi0wZjk4N2JkNjRmNzEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU0NDkwMDQ5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InBhbmFseXplciJ9.gXZ-7_3E8BPBapLWixVd9NCoSuEyJn80bdx87sIXHco"]
+    # with open('api_keys.txt') as api_keys_file:
+    #     for key in api_keys_file:
+    #         api_keys.append(key)
+
+    # Get list of matches (also checks key limits)
+    sample_matches = get_sample_matches(api_keys[0])
+
+    # Survey all downloaded files to make list of all downloaded matches
+    # TODO
+
+    # For all matches not yet downloaded, put them in an array
+    # TODO
+
+    # Query each match on the API and dump its info, logging telemetry URL in an array
+    for match in sample_matches:
+        get_match_stats(match)
+
+    # Download matches from the array
+    # TODO
+
+    # Decompress matches
+    # TODO
 
 
 # Get a list of random match IDs from the PUBG API
-def get_matches():
+def get_sample_matches(api_key):
+    print("Getting sample matches with API key %s", api_key)
     # Header for auth
-    header = {"Authorization" : "Bearer %s" % apikey,
+    header = {"Authorization" : "Bearer %s" % api_key,
               "Accept" : "application/vnd.api+json"}
 
     # Get the API call data
-    apireq = requests.get("https://api.pubg.com/shards/steam/samples", headers=header)
+    api_result = requests.get("https://api.pubg.com/shards/steam/samples", headers=header)
+    if api_result.status_code == 403:
+        return None
 
     # Dump json data into pandas for better formatting
-    samples_df = pd.DataFrame(apireq.json())
+    samples_df = pd.DataFrame(api_result.json())
 
     # Extract just the match data
     samples_norm = json_normalize(samples_df.loc['relationships'])
@@ -79,3 +106,6 @@ def extract_gzip(gzip_indir, gzip_outdir):
             print("Unable to copy file '" + gzip_indir + f + "'\n")
 
     print("Copying data - done")
+
+if __name__== "__main__":
+    main()
