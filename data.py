@@ -83,15 +83,14 @@ def extract_gzip(gzip_indir, gzip_outdir):
 
 #tel_file (json file path) -> pandas.DataFrame
 #Returns a dataframe of logs on parachute landing
-def telemetry_exploration(tel_file): 
+def telemetry_pland(tel_file): 
     tel_df = None
     drop_events = []
     with open(tel_file) as f: 
         json_file = json.load(f)
         for entry in json_file: 
-            if 'character' in entry.keys() and 'distance' in entry.keys():
+            if 'LogParachuteLanding' == entry['_T']:
                 drop_events.append(entry)
 
     drop_table = json_normalize(drop_events)
     return drop_table
-
