@@ -4,6 +4,7 @@ import requests
 import gzip 
 import shutil
 import os 
+import json 
 
 apikey = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyY2IxM2ZhMC0zYzQ1LTAxMzctODYwNC0wMWI0YTFkMWRiOWEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU0NzM5MTUxLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii02MTA3ZjhlYS1kZjNlLTQzYTctYTU5Ni1hMzljYTY5NDQ2NzUifQ.Aqxif7hL74A6LxrnpO7LNZYMCACAf4HHYTatEs3UWYs"
 
@@ -79,3 +80,18 @@ def extract_gzip(gzip_indir, gzip_outdir):
             print("Unable to copy file '" + gzip_indir + f + "'\n")
 
     print("Copying data - done")
+
+#tel_file (json file path) -> pandas.DataFrame
+#Returns a dataframe of logs on parachute landing
+def telemetry_exploration(tel_file): 
+    tel_df = None
+    drop_events = []
+    with open(tel_file) as f: 
+        json_file = json.load(f)
+        for entry in json_file: 
+            if 'character' in entry.keys() and 'distance' in entry.keys():
+                drop_events.append(entry)
+
+    drop_table = json_normalize(drop_events)
+    return drop_table
+
