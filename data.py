@@ -3,7 +3,15 @@ from pandas.io.json import json_normalize
 import requests
 import gzip 
 import shutil
-import os 
+import os
+import time
+
+class API_Key:
+    def __init__(self, key_string, limit_qty, limit_remaining, limit_reset):
+        self.key_string = key_string
+        self.limit_qty = 0
+        self.limit_remaining = 0
+        self.limit_reset = time.clock()
 
 def main():
     # Check API key
