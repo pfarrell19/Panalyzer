@@ -29,10 +29,15 @@ def main():
     # Get matches and test keys
     match_id_queue = []
     for key in api_keys:
+        if key.limit_remaining == 0:
+            continue
         sample_matches = get_sample_matches(key)
         if sample_matches.response_code == 200:
             match_id_queue.extend(sample_matches.match_ids)
             break
+
+    if len(match_id_queue) < 1:
+        logging.error("Could not get any match ids")
 
     # Survey all downloaded files to make list of all downloaded matches
     # TODO
@@ -67,19 +72,22 @@ def get_sample_matches(api_key):
     sample_matches = Match_Samples_Response(api_result.status_code)
 
     if api_result.status_code == 200:
+        logging.info("Received sample matches (HTTP status code 200), extracting match ids")
         # Dump json data into pandas for better formatting
         samples_df = pd.DataFrame(api_result.json())
 
         # Extract just the match data
         samples_norm = json_normalize(samples_df.loc['relationships'])
         sample_matches.match_ids = samples_norm['matches.data'].apply(pd.Series).T[0].apply(pd.Series)
+    else:
+        logging.info("HTTP status code %s encountered while retrieving matches", api_result.status_code)
 
     return sample_matches
 
 
 # Given a match ID, pull the data for that match and return it as a pandas DataFrame
 def get_match_stats(matchID):
-    header = {"accept" : "application/vnd.api+json"}
+    header = {"accept": "application/vnd.api+json"}
     apireq = requests.get("https://api.pubg.com/shards/steam/matches/%s" % matchID, headers=header)
 
     # API response is structured: { data : {...}
