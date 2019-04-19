@@ -5,23 +5,34 @@ import gzip
 import shutil
 import os
 import time
+import logging
 
 class API_Key:
-    def __init__(self, key_string, limit_qty, limit_remaining, limit_reset):
+    def __init__(self, key_string):
         self.key_string = key_string
-        self.limit_qty = 0
-        self.limit_remaining = 0
-        self.limit_reset = time.clock()
+        self.limit_qty = -1
+        self.limit_remaining = -1
+        self.limit_reset = -1
+
+class Match_Samples_Response:
+    def __init__(self, response_code):
+        self.response_code = response_code
+        self.match_ids = []
 
 def main():
     # Check API key
-    api_keys = ["eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIyZmZlNTYxMC0zYTAxLTAxMzctOWEwNi0wZjk4N2JkNjRmNzEiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU0NDkwMDQ5LCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6InBhbmFseXplciJ9.gXZ-7_3E8BPBapLWixVd9NCoSuEyJn80bdx87sIXHco"]
-    # with open('api_keys.txt') as api_keys_file:
-    #     for key in api_keys_file:
-    #         api_keys.append(key)
+    api_keys = []
+    with open('api_keys.txt') as api_keys_file:
+        for key in api_keys_file:
+            api_keys.append(API_Key(key))
 
-    # Get list of matches (also checks key limits)
-    sample_matches = get_sample_matches(api_keys[0])
+    # Get matches and test keys
+    match_id_queue = []
+    for key in api_keys:
+        sample_matches = get_sample_matches(key)
+        if sample_matches.response_code == 200:
+            match_id_queue.extend(sample_matches.match_ids)
+            break
 
     # Survey all downloaded files to make list of all downloaded matches
     # TODO
@@ -42,24 +53,28 @@ def main():
 
 # Get a list of random match IDs from the PUBG API
 def get_sample_matches(api_key):
-    print("Getting sample matches with API key %s", api_key)
+    logging.info("Getting sample matches")
+    logging.debug("Using API key %s to get sample matches", api_key.key_string)
     # Header for auth
-    header = {"Authorization" : "Bearer %s" % api_key,
-              "Accept" : "application/vnd.api+json"}
+    header = {"Authorization": "Bearer %s" % api_key.key_string,
+              "Accept": "application/vnd.api+json"}
 
     # Get the API call data
     api_result = requests.get("https://api.pubg.com/shards/steam/samples", headers=header)
-    if api_result.status_code == 403:
-        return None
+    api_key.limit_remaining = api_result.headers.get("X-Ratelimit-Remaining")
+    api_key.limit_qty = api_result.headers.get("X-Ratelimit-Limit")
+    api_key.limit_reset = api_result.headers.get("X-Ratelimit-Reset")
+    sample_matches = Match_Samples_Response(api_result.status_code)
 
-    # Dump json data into pandas for better formatting
-    samples_df = pd.DataFrame(api_result.json())
+    if api_result.status_code == 200:
+        # Dump json data into pandas for better formatting
+        samples_df = pd.DataFrame(api_result.json())
 
-    # Extract just the match data
-    samples_norm = json_normalize(samples_df.loc['relationships'])
-    matches = samples_norm['matches.data'].apply(pd.Series).T[0].apply(pd.Series)
+        # Extract just the match data
+        samples_norm = json_normalize(samples_df.loc['relationships'])
+        sample_matches.match_ids = samples_norm['matches.data'].apply(pd.Series).T[0].apply(pd.Series)
 
-    return matches['id']
+    return sample_matches
 
 
 # Given a match ID, pull the data for that match and return it as a pandas DataFrame
