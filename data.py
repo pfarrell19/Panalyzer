@@ -6,11 +6,12 @@ import shutil
 import os
 import time
 import logging
+import match
 
 class API_Key:
     def __init__(self, key_string):
         self.key_string = key_string
-        self.limit_qty = -1
+        self.limit_max = -1
         self.limit_remaining = -1
         self.limit_reset = -1
 
@@ -24,11 +25,14 @@ def main():
     api_keys = []
     with open('api_keys.txt') as api_keys_file:
         for key in api_keys_file:
-            api_keys.append(API_Key(key))
+            api_keys.append(API_Key(key.rstrip()))
 
     # Get matches and test keys
+    sample_matches = None
     match_id_queue = []
     for key in api_keys:
+        if key.limit_reset < time.time():
+            key.limit_remaining = key.limit_max
         if key.limit_remaining == 0:
             continue
         sample_matches = get_sample_matches(key)
@@ -46,7 +50,10 @@ def main():
     # TODO
 
     # Query each match on the API and dump its info, logging telemetry URL in an array
-    for match in sample_matches:
+    if sample_matches is None:
+        logging.exception("No match ids found to download, quitting")
+        exit()
+    for match in sample_matches.match_ids:
         get_match_stats(match)
 
     # Download matches from the array
@@ -78,7 +85,8 @@ def get_sample_matches(api_key):
 
         # Extract just the match data
         samples_norm = json_normalize(samples_df.loc['relationships'])
-        sample_matches.match_ids = samples_norm['matches.data'].apply(pd.Series).T[0].apply(pd.Series)
+        match_ids_dataframe = samples_norm['matches.data'].apply(pd.Series).T[0].apply(pd.Series)
+        sample_matches.match_ids = match_ids_dataframe['id'].values
     else:
         logging.info("HTTP status code %s encountered while retrieving matches", api_result.status_code)
 
@@ -86,29 +94,41 @@ def get_sample_matches(api_key):
 
 
 # Given a match ID, pull the data for that match and return it as a pandas DataFrame
-def get_match_stats(matchID):
+def get_match_stats(match_id):
     header = {"accept": "application/vnd.api+json"}
-    apireq = requests.get("https://api.pubg.com/shards/steam/matches/%s" % matchID, headers=header)
+    apireq = requests.get("https://api.pubg.com/shards/steam/matches/%s" % match_id, headers=header)
 
     # API response is structured: { data : {...}
     #                               included: [...] }
     # where data has information about the IDs of the match objects (players, rosters, etc) and
     # included contains links to the actual objects about the match (look up by ID from data)
 
-    # get the data
-    match_df = pd.DataFrame(apireq.json()['data'])
+    # Import the "data" portion of the API response into Pandas
+    api_response_data_dataframe = pd.DataFrame(apireq.json()['data'])
+    # Import the "included" portion of the API response into Pandas
+    api_response_included_dataframe = pd.DataFrame(apireq.json()['included'])
 
-    # Get the id of the telemetry object to look up in the included array
-    assets = pd.DataFrame(match_df.loc['assets', 'relationships'])['data'].apply(pd.Series)
+    # Get the telemetry URL from its asset UID.
+    # The telemetry UID is different from the match UID so we must retrieve the telemetry UID.
+    # The telemetry UID the only "id" field in the only "data" entry of "type": "asset" ...
+    # ... under "data" -> "relationships" -> "assets"
+
+    # Get the assets portion of the data
+    assets = pd.DataFrame(api_response_data_dataframe.loc['assets', 'relationships'])['data'].apply(pd.Series)
+    # The telemetry id is the only entry of type "data" under section "assets", so grab it
     telemetry_id = assets[assets.type == "asset"]['id'].values[0]
+    # Get the telemetry object from the "included" dataframe
+    telemetry_object = api_response_included_dataframe[api_response_included_dataframe.id == telemetry_id]
+    # Get the url from the telemetry object
+    telemetry_url = telemetry_object['attributes'].apply(pd.Series)['URL']
 
-    # Get the telemetry object from the included array
-    match_data = pd.DataFrame(apireq.json()['included'])
-    telemetry_object = match_data[match_data.id == telemetry_id]
-
-    # Return the url of the telemetry object
-    return telemetry_object['attributes'].apply(pd.Series)['URL']
-
+    # Extract match statistics and create a match object
+    game_mode = api_response_data_dataframe.loc['gameMode', 'attributes']
+    map = api_response_data_dataframe.loc['mapName', 'attributes']
+    start_time = api_response_data_dataframe.loc['createdAt', 'attributes']
+    duration = api_response_data_dataframe.loc['duration', 'attributes']
+    match_data_object = match.match(match_id, game_mode, map, start_time, duration, telemetry_url)
+    return match_data_object
 
 # Given location of gzips and location of where to extract to -> unzips gzip files
 def extract_gzip(gzip_indir, gzip_outdir): 
