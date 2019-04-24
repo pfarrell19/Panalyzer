@@ -28,40 +28,30 @@ def get_matches():
     return matches['id']
 
 
-# Extract the telemetry json url from the match as well as the winning player's IDs (written to winner_outfile)
-def get_match_data(matchID, winner_outfile):
-
+# Given a matchID, get the 'data' dict and 'included' array from the matches endpoint API request
+# API response is structured: { data : {...},
+#                               included: [...],
+#                               links [...],
+#                               meta {}}
+# where 'data' has information about the IDs of the match objects (players, rosters, etc) and
+# 'included' contains links to the actual objects about the match (look up by ID from data)
+# 'links' and 'meta' can be ignored for now
+def get_match_info(matchID):
     header = {"accept": "application/vnd.api+json"}
     apireq = requests.get("https://api.pubg.com/shards/steam/matches/%s" % matchID, headers=header)
-
-    # API response is structured: { data : {...}
-    #                               included: [...] }
-    # where data has information about the IDs of the match objects (players, rosters, etc) and
-    # included contains links to the actual objects about the match (look up by ID from data)
 
     # get the data
     match_data = pd.DataFrame(apireq.json()['data'])
     match_included = pd.DataFrame(apireq.json()['included'])
 
+    return match_data, match_included
+
+
+# Extract the url of the telemetry json file from 'data' and 'included' returned from the matches endpoint query
+def get_telemetry(match_data, match_included):
     # Get the id of the telemetry object to look up in the included array
     assets = pd.DataFrame(match_data.loc['assets', 'relationships'])['data'].apply(pd.Series)
     telemetry_id = assets[assets.type == "asset"]['id'].values[0]
-
-    # Get the winning roster
-    rosters = pd.DataFrame(match_data.loc['rosters', 'relationships'])['data'].apply(pd.Series)
-    rosters_included = match_included[match_included.type == 'roster']
-    combined = rosters_included.merge(rosters, on='id')
-    combined = pd.concat([combined.drop(['attributes', 'relationships'], axis=1),
-                                combined['attributes'].apply(pd.Series),
-                                combined['relationships'].apply(pd.Series)], axis=1)
-
-    winning_team = combined[combined.won == 'true']
-    winning_participants = json_normalize(winning_team['participants'].values[0], record_path='data')
-
-    # Now get the data (stats, etc) related to the winning players from the included array
-    winning_participants_data = match_included[match_included.id.isin(winning_participants.id)]
-    # And write it to disk
-    winning_participants_data.to_csv(winner_outfile, header=False, mode="a")
 
     # Get the telemetry object from the included array
     telemetry_object = match_included[match_included.id == telemetry_id]
@@ -69,6 +59,25 @@ def get_match_data(matchID, winner_outfile):
     # Return the url of the telemetry object
     return telemetry_object['attributes'].apply(pd.Series)['URL']
 
+# Extract the statistics for the winning players from 'data' and 'included' returned from the matches endpoint query
+def get_winner_stats(match_data, match_included):
+    # Get the roster from the 'data' dict (has the IDs of the objects in the included array)
+    # and combine with the actual data for the players from the 'included' array
+    rosters = pd.DataFrame(match_data.loc['rosters', 'relationships'])['data'].apply(pd.Series)
+    rosters_included = match_included[match_included.type == 'roster']
+    combined = rosters_included.merge(rosters, on='id')
+    combined = pd.concat([combined.drop(['attributes', 'relationships'], axis=1),
+                                combined['attributes'].apply(pd.Series),
+                                combined['relationships'].apply(pd.Series)], axis=1)
+
+    # Get the winners
+    winning_team = combined[combined.won == 'true']
+    winning_participants = json_normalize(winning_team['participants'].values[0], record_path='data')
+
+    # Now get the data (stats, etc) related to the winning players from the included array
+    winning_participants_data = match_included[match_included.id.isin(winning_participants.id)]
+
+    return winning_participants_data
 
 # Given location of gzips and location of where to extract to -> unzips gzip files
 def extract_gzip(gzip_indir, gzip_outdir): 
