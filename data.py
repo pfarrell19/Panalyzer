@@ -7,6 +7,8 @@ import os
 import time
 import logging
 import match
+import json
+import sys
 
 class API_Key:
     def __init__(self, key_string):
@@ -21,6 +23,15 @@ class Match_Samples_Response:
         self.match_ids = []
 
 def main():
+    # Set up logging
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
+
     # Check API key
     api_keys = []
     with open('api_keys.txt') as api_keys_file:
@@ -39,7 +50,8 @@ def main():
         if sample_matches.response_code == 200:
             match_id_queue.extend(sample_matches.match_ids)
             break
-
+    # DEBUG: Limiting to 10
+    match_id_queue = match_id_queue[:10]
     if len(match_id_queue) < 1:
         logging.error("Could not get any match ids")
 
@@ -49,18 +61,23 @@ def main():
     # For all matches not yet downloaded, put them in an array
     # TODO
 
-    # Query each match on the API and dump its info, logging telemetry URL in an array
+    # Query each match on the API and dump its info
+    match_stats = []
     if sample_matches is None:
         logging.exception("No match ids found to download, quitting")
         exit()
-    for match in sample_matches.match_ids:
-        get_match_stats(match)
+    for match in match_id_queue:
+        match_stats.append(get_match_stats(match))
 
-    # Download matches from the array
-    # TODO
+    # Download match telemetry from the array
+    parsed_json = []
+    for stats in match_stats:
+        parsed_json.append(get_telemetry(stats.telemetry_url))
 
     # Decompress matches
     # TODO
+
+    return
 
 
 # Get a list of random match IDs from the PUBG API
@@ -120,7 +137,7 @@ def get_match_stats(match_id):
     # Get the telemetry object from the "included" dataframe
     telemetry_object = api_response_included_dataframe[api_response_included_dataframe.id == telemetry_id]
     # Get the url from the telemetry object
-    telemetry_url = telemetry_object['attributes'].apply(pd.Series)['URL']
+    telemetry_url = telemetry_object['attributes'].apply(pd.Series)['URL'].values[0]
 
     # Extract match statistics and create a match object
     game_mode = api_response_data_dataframe.loc['gameMode', 'attributes']
@@ -129,6 +146,12 @@ def get_match_stats(match_id):
     duration = api_response_data_dataframe.loc['duration', 'attributes']
     match_data_object = match.match(match_id, game_mode, map, start_time, duration, telemetry_url)
     return match_data_object
+
+
+def get_telemetry(telemetry_url):
+    response = requests.get(telemetry_url)
+    parsed_telemetry = json.loads(response.text)
+    return parsed_telemetry
 
 # Given location of gzips and location of where to extract to -> unzips gzip files
 def extract_gzip(gzip_indir, gzip_outdir): 
