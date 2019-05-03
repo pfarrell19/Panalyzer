@@ -9,6 +9,10 @@ import logging
 import match
 import json
 import sys
+import multiprocessing
+import pickle
+import queue
+from threading import Thread
 
 class API_Key:
     def __init__(self, key_string):
@@ -22,8 +26,12 @@ class Match_Samples_Response:
         self.response_code = response_code
         self.match_ids = []
 
-def main():
+def main2():
+    api_keys_filename = "api_keys.txt"
+    download_threads = 4
+
     # Set up logging
+    logging.debug("Setting up logging")
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
     handler = logging.StreamHandler(sys.stdout)
@@ -32,28 +40,99 @@ def main():
     handler.setFormatter(formatter)
     root.addHandler(handler)
 
-    # Check API key
+    # Get API keys
+    logging.debug("Getting API keys from file %s", api_keys_filename)
     api_keys = []
-    with open('api_keys.txt') as api_keys_file:
+    with open(api_keys_filename) as api_keys_file:
         for key in api_keys_file:
             api_keys.append(API_Key(key.rstrip()))
 
+    # Set up processing pool
+    telemetry_queue = multiprocessing.Queue()
+    downloaders = multiprocessing.Pool(4, handle_telemetry, (telemetry_queue,))
+
     # Get matches and test keys
+    logging.debug("Cycling through API keys to retrieve sample set of match ids")
     sample_matches = None
     match_id_queue = []
     for key in api_keys:
         if key.limit_reset < time.time():
             key.limit_remaining = key.limit_max
         if key.limit_remaining == 0:
+            logging.info("API key ending in %s has no uses remaining, skipping and trying next key in pool", key[-4::])
             continue
         sample_matches = get_sample_matches(key)
         if sample_matches.response_code == 200:
             match_id_queue.extend(sample_matches.match_ids)
+            logging.debug("Sample match ids acquired")
             break
-    # DEBUG: Limiting to 10
-    match_id_queue = match_id_queue[:10]
     if len(match_id_queue) < 1:
-        logging.error("Could not get any match ids")
+        logging.error("Could not get any match ids with any keys in pool")
+
+    # Query each match on the API and dump its info
+    logging.debug("Retrieving info about each match")
+    if sample_matches is None:
+        logging.exception("No match ids found to download, quitting")
+        exit()
+    for count, match in enumerate(match_id_queue):
+        logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
+        match_object = get_match_stats(match)
+        telemetry_queue.put(match_object)
+
+def handle_telemetry(telemetry_queue):
+    logging.info("Worker process active")
+    while True:
+        match_object = telemetry_queue.get()
+        logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
+        parsed_telemetry = get_telemetry(match_object.telemetry_url)
+        # Save telemetry
+        match_file_name = match_object.match_id + "_telemetry.pickle"
+        telemetry_file_name = match_object.match_id + "_telemetry.pickle"
+        logging.debug("Attempting to write files for match %s", match_object.match_id)
+        with open(telemetry_file_name, 'wb') as output_file:
+            logging.debug("Outputting telemetry contents into %s", telemetry_file_name)
+            pickle.dump(parsed_telemetry, output_file, pickle.HIGHEST_PROTOCOL)
+        with open(match_file_name, 'wb') as output_file:
+            logging.debug("Outputting match contents into %s", match_file_name)
+            pickle.dump(match_object, output_file, pickle.HIGHEST_PROTOCOL)
+
+def main():
+    api_keys_filename = "api_keys.txt"
+
+    # Set up logging
+    logging.debug("Setting up logging")
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
+
+    # Get API keys
+    logging.debug("Getting API keys from file %s", api_keys_filename)
+    api_keys = []
+    with open(api_keys_filename) as api_keys_file:
+        for key in api_keys_file:
+            api_keys.append(API_Key(key.rstrip()))
+
+    # Get matches and test keys
+    logging.debug("Cycling through API keys to retrieve sample set of match ids")
+    sample_matches = None
+    match_id_queue = []
+    for key in api_keys:
+        if key.limit_reset < time.time():
+            key.limit_remaining = key.limit_max
+        if key.limit_remaining == 0:
+            logging.info("API key ending in %s has no uses remaining, skipping and trying next key in pool", key[-4::])
+            continue
+        sample_matches = get_sample_matches(key)
+        if sample_matches.response_code == 200:
+            match_id_queue.extend(sample_matches.match_ids)
+            logging.debug("Sample match ids acquired")
+            break
+    if len(match_id_queue) < 1:
+        logging.error("Could not get any match ids with any keys in pool")
 
     # Survey all downloaded files to make list of all downloaded matches
     # TODO
@@ -62,14 +141,17 @@ def main():
     # TODO
 
     # Query each match on the API and dump its info
+    logging.debug("Retrieving info about each match")
     match_stats = []
     if sample_matches is None:
         logging.exception("No match ids found to download, quitting")
         exit()
-    for match in match_id_queue:
+    for count,match in enumerate(0,match_id_queue):
+        logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
         match_stats.append(get_match_stats(match))
 
     # Download match telemetry from the array
+    logging.debug("Downloading and parsing telemetry from each match")
     parsed_json = []
     for stats in match_stats:
         parsed_json.append(get_telemetry(stats.telemetry_url))
@@ -77,13 +159,14 @@ def main():
     # Decompress matches
     # TODO
 
+    logging.info("All action completed, exiting")
     return
 
 
 # Get a list of random match IDs from the PUBG API
 def get_sample_matches(api_key):
     logging.info("Getting sample matches")
-    logging.debug("Using API key %s to get sample matches", api_key.key_string)
+    logging.debug("Using API key ending in %s to get sample matches", api_key.key_string[-4:])
     # Header for auth
     header = {"Authorization": "Bearer %s" % api_key.key_string,
               "Accept": "application/vnd.api+json"}
@@ -112,6 +195,7 @@ def get_sample_matches(api_key):
 
 # Given a match ID, pull the data for that match and return it as a pandas DataFrame
 def get_match_stats(match_id):
+    logging.debug("Getting match stats for match id %s", match_id)
     header = {"accept": "application/vnd.api+json"}
     apireq = requests.get("https://api.pubg.com/shards/steam/matches/%s" % match_id, headers=header)
 
@@ -120,6 +204,7 @@ def get_match_stats(match_id):
     # where data has information about the IDs of the match objects (players, rosters, etc) and
     # included contains links to the actual objects about the match (look up by ID from data)
 
+    logging.debug("Match data request completed, parsing response")
     # Import the "data" portion of the API response into Pandas
     api_response_data_dataframe = pd.DataFrame(apireq.json()['data'])
     # Import the "included" portion of the API response into Pandas
@@ -149,7 +234,9 @@ def get_match_stats(match_id):
 
 
 def get_telemetry(telemetry_url):
+    logging.debug("Retrieving telemetry data from url %s", telemetry_url)
     response = requests.get(telemetry_url)
+    logging.debug("Parsing telemetry JSON")
     parsed_telemetry = json.loads(response.text)
     return parsed_telemetry
 
@@ -182,4 +269,4 @@ def extract_gzip(gzip_indir, gzip_outdir):
     print("Copying data - done")
 
 if __name__== "__main__":
-    main()
+    main2()
