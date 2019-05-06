@@ -47,10 +47,6 @@ def main2():
         for key in api_keys_file:
             api_keys.append(API_Key(key.rstrip()))
 
-    # Set up processing pool
-    telemetry_queue = multiprocessing.Queue()
-    downloaders = multiprocessing.Pool(4, handle_telemetry, (telemetry_queue,))
-
     # Get matches and test keys
     logging.debug("Cycling through API keys to retrieve sample set of match ids")
     sample_matches = None
@@ -74,13 +70,19 @@ def main2():
     if sample_matches is None:
         logging.exception("No match ids found to download, quitting")
         exit()
+    telemetry_queue = multiprocessing.Queue()
+    for i in range(os.cpu_count()):
+        new_thread = Thread(target=handle_telemetry(telemetry_queue))
+        new_thread.daemon = True
+        new_thread.start() # TODO: Gets stuck here
     for count, match in enumerate(match_id_queue):
         logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
         match_object = get_match_stats(match)
         telemetry_queue.put(match_object)
+    telemetry_queue.join()
 
 def handle_telemetry(telemetry_queue):
-    logging.info("Worker process active")
+    logging.info("Worker thread active")
     while True:
         match_object = telemetry_queue.get()
         logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
