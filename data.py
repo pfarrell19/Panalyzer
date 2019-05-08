@@ -72,9 +72,9 @@ def main2():
         exit()
     telemetry_queue = multiprocessing.Queue()
     for i in range(os.cpu_count()):
-        new_thread = Thread(target=handle_telemetry(telemetry_queue))
+        new_thread = Thread(target=handle_telemetry, args=(telemetry_queue,))
         new_thread.daemon = True
-        new_thread.start() # TODO: Gets stuck here
+        new_thread.start()  # TODO: Gets stuck here
     for count, match in enumerate(match_id_queue):
         logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
         match_object = get_match_stats(match)
