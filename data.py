@@ -77,7 +77,10 @@ def get_winner_stats(match_data, match_included):
     # Now get the data (stats, etc) related to the winning players from the included array
     winning_participants_data = match_included[match_included.id.isin(winning_participants.id)]
 
-    return winning_participants_data
+    winner_data_all = pd.concat([winning_participants_data.drop('attributes', axis=1),
+                       winning_participants_data['attributes'].apply(pd.Series)['stats'].apply(pd.Series)], axis=1)
+
+    return winner_data_all
 
 # Given location of gzips and location of where to extract to -> unzips gzip files
 def extract_gzip(gzip_indir, gzip_outdir): 
@@ -120,3 +123,10 @@ def telemetry_pland(tel_file):
 
     drop_table = json_normalize(drop_events)
     return drop_table
+
+
+if __name__ == "__main__":
+    matches = get_matches()
+    data, included = get_match_info(matches[0])
+    winners = get_winner_stats(data, included)
+    print(winners)
