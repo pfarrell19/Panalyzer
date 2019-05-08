@@ -88,7 +88,7 @@ def handle_telemetry(telemetry_queue):
         logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
         parsed_telemetry = get_telemetry(match_object.telemetry_url)
         # Save telemetry
-        match_file_name = match_object.match_id + "_telemetry.pickle"
+        match_file_name = match_object.match_id + "_match.pickle"
         telemetry_file_name = match_object.match_id + "_telemetry.pickle"
         logging.debug("Attempting to write files for match %s", match_object.match_id)
         with open(telemetry_file_name, 'wb') as output_file:
