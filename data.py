@@ -11,8 +11,8 @@ import json
 import sys
 import multiprocessing
 import pickle
-import queue
 from threading import Thread
+from pathlib import Path
 
 class API_Key:
     def __init__(self, key_string):
@@ -28,7 +28,7 @@ class Match_Samples_Response:
 
 def main():
     api_keys_filename = "api_keys.txt"
-    download_threads = os.cpu_count()
+    download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
 
     # Set up logging
     logging.debug("Setting up logging")
@@ -85,17 +85,21 @@ def handle_telemetry(telemetry_queue):
     logging.info("Worker thread active")
     while True:
         match_object = telemetry_queue.get()
-        logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
-        parsed_telemetry = get_telemetry(match_object.telemetry_url)
-        # Save telemetry
-        match_file_name = match_object.match_id + "_match.pickle"
-        telemetry_file_name = match_object.match_id + "_telemetry.pickle"
-        with open(telemetry_file_name, 'wb') as output_file:
-            logging.debug("Outputting telemetry contents into %s", telemetry_file_name)
-            pickle.dump(parsed_telemetry, output_file, pickle.HIGHEST_PROTOCOL)
-        with open(match_file_name, 'wb') as output_file:
-            logging.debug("Outputting match contents into %s", match_file_name)
-            pickle.dump(match_object, output_file, pickle.HIGHEST_PROTOCOL)
+        # Save telemetry if it's new
+        match_file_name = "data/" + match_object.match_id + "_match.pickle"
+        match_data_file = Path(match_file_name)
+        if match_data_file.is_file():
+            logging.info("Match id %s already saved to disk, skipping file write", match_object.match_id)
+        else:
+            logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
+            parsed_telemetry = get_telemetry(match_object.telemetry_url)
+            telemetry_file_name = "data/" + match_object.match_id + "_telemetry.pickle"
+            with open(telemetry_file_name, 'wb') as output_file:
+                logging.debug("Outputting telemetry contents into %s", telemetry_file_name)
+                pickle.dump(parsed_telemetry, output_file, pickle.HIGHEST_PROTOCOL)
+            with open(match_file_name, 'wb') as output_file:
+                logging.debug("Outputting match contents into %s", match_file_name)
+                pickle.dump(match_object, output_file, pickle.HIGHEST_PROTOCOL)
 
 # Get a list of random match IDs from the PUBG API
 def get_sample_matches(api_key):
