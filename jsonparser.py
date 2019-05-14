@@ -1,15 +1,82 @@
 import pickle
 import os
+import json
 import matplotlib.pyplot as plt
 
 # TODO: remove global...
 CM_TO_KM = 100000           # CM in a KM
 MAX_MAP_SIZE = 8            # In KM
 
-def search(json_object, player_id, start_range, end_range, event_type):
+def search(json_object, player_id=None, start_range=None, end_range=None, event_type=None):
     # TODO
-    return
+    events = []
+    i = 0
+    for entry in json_object: 
+        if (isEvent(entry, event_type) and 
+                inRange(entry['_D'], start_range, end_range) and 
+                hasPlayer(entry, player_id)):
+            
+            events.append(entry)
+    return events
 
+def inRange(time, start, end):
+    if start is None and end is None:
+        return True
+    elif start is None:
+        return isAfter(end, time)
+    elif end is None:
+        return isAfter(time, start)
+    else:
+        return isAfter(time, start) and isAfter(end, time)
+
+def isAfter(time1, time2):
+    T_index = time1.find('T')
+    date1 = time1[:T_index].encode('ascii', 'ignore')
+    date1 = date1.split('-')
+    time1 = time1[T_index + 1:][:-1].encode('ascii', 'ignore')
+    time1 = time1.split(':')
+
+    T_index = time2.find('T')
+    date2 = time2[:T_index].encode('ascii', 'ignore')
+    date2 = date2.split('-')
+    time2 = time2[T_index + 1:][:-1].encode('ascii', 'ignore')
+    time2 = time2.split(':')
+
+    equals = True
+
+    for x in range(3):
+        if (int(date1[x]) > int(date2[x])):
+                return True
+    for x in range(2):
+        if (int(time1[x]) > int(time2[x])):
+                return True
+
+    if (float(time1[2]) > float(time2[2])):
+        return True
+
+    if time1 != time2:
+        return False
+
+    return equals
+
+
+def hasPlayer(event, player_id):
+    if player_id is None:
+        return True
+
+    for key in ['character', 'attacker', 'victim', 'assistant', 'reviver']:
+        if key in event.keys():
+            if event[key]['accountId'] == player_id:
+                return True
+        else:
+            return False
+    return False
+
+def isEvent(event, event_type):
+    if event_type is None:
+        return True
+    else:
+        return event_type == event['_T']
 
 # Return the dict from the pickle file name
 def load_pickle(pickle_file):
@@ -150,5 +217,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
