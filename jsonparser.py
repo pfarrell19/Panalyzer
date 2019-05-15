@@ -7,6 +7,11 @@ import matplotlib.pyplot as plt
 CM_TO_KM = 100000           # CM in a KM
 MAX_MAP_SIZE = 8            # In KM
 
+# search for specific attributes 
+# player_id :   players acount id (eg. 'acount.*****')
+# start_range : starting time (eg. 'YYYY-MM-DDTHH:MM:SS.SSSZ')
+# end_range:    ending time 
+# event_type:   type of event (eg. 'LogParachuteLanding')
 def search(json_object, player_id=None, start_range=None, end_range=None, event_type=None):
     # TODO
     events = []
