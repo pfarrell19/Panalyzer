@@ -2,6 +2,10 @@ import pickle
 import os
 import json
 import matplotlib.pyplot as plt
+from scipy.misc import imread
+import math
+import numpy as np
+import pandas as pd
 
 # TODO: remove global...
 CM_TO_KM = 100000           # CM in a KM
@@ -136,7 +140,7 @@ def get_all_landings(telemetry):
             landings[log_entry['character']['name']] = [x, y]
     return landings
 
-
+# Returns the first  and last locations someone jumped out of the plane
 def get_flight_data(telemetry):
     first_coordinate = None # First player exit event from plane
     current_coordinate = None # Last player exist even from plane
@@ -148,6 +152,50 @@ def get_flight_data(telemetry):
     return first_coordinate, current_coordinate
 
 
+# Returns the unit vector for the flight path given the first and last location someone exited plane
+def get_flight_vector(first_drop, last_drop):
+    flight_vector = np.array([last_drop['x'] - first_drop['x'], last_drop['y'] - first_drop['y']])
+    vector_length = np.linalg.norm(flight_vector)
+    flight_vector_norm = flight_vector / vector_length
+    return flight_vector_norm
+
+# Returns the angle between the two flight vectors u and v (squared)
+# Note: u and v must be unit vectors already
+def flight_diff(u, v):
+    return np.arccos(np.clip(np.dot(u, v), -1, 1))**2
+
+# Given a flight path (unit vectorized), get the direction that it is closest to
+# from one of the eight recognized cardinal directions
+def get_flight_category(flight_vector):
+    # Set up unit vectors for the 8 directions to classify flight paths as
+    between_mag = 1 / math.sqrt(2)
+    nn = [0, 1]
+    ne = [between_mag, between_mag]
+    ee = [1, 0]
+    se = [between_mag, -between_mag]
+    ss = [0, -1]
+    sw = [-between_mag, -between_mag]
+    ww = [-1, 0]
+    nw = [-between_mag, between_mag]
+
+    # Put em in a DataFrame for processing
+    directions = np.array([nn, ne, ee, se, ss, sw, ww, nw])
+    dirs_df = pd.DataFrame(directions)
+
+    # Combine the x, y component columns, add direction names, and get rid of the excess
+    dirs_df['direction_vec'] = list(zip(dirs_df[0], dirs_df[1]))
+    dirs_df['direction'] = np.array(['nn', 'ne', 'ee', 'se', 'ss', 'sw', 'ww', 'nw'])
+    dirs_df.drop([0, 1], axis=1, inplace=True)
+
+    # Calculate the angle between the flight_vector and each of the 8 directions
+    # and store it under a new column, 'angle_from_path'
+    dirs_df['angle_from_path'] = dirs_df['direction_vec'].apply(flight_diff, args=(flight_vector,))
+
+    # And return the direction (string) where the angle between the flight_vector
+    # and the direction is minimized (i.e. the closest direction to the flight_vector)
+    return dirs_df['direction'].loc[dirs_df['angle_from_path'].idxmin()]
+
+
 # Plot the drop locations of each player (in blue), with opacity in relation to their rank in that match
 # (more opaque = lower rank), along with the location the first person left the plane (in green)
 # and the last person to leave the plane (in red)
@@ -156,16 +204,29 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
     rankings = get_rankings(telemetry)
     mapName = get_map(telemetry)
 
+
     # Set up plot scale
     if mapName == "Savage_Main":                        # 4km map
         x_max = MAX_MAP_SIZE * (1/2)
         y_max = x_max
-    elif mapName in ["Erangel_Main", "Desert_Main"]:    # 8km maps
+        map_img = imread("savage.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 4.0, 0.0, 4.0])
+
+    elif mapName == "Erangel_Main":                     # 8km map
         x_max = MAX_MAP_SIZE
         y_max = MAX_MAP_SIZE
+        map_img = imread("erangel.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
+    elif mapName ==  "Desert_Main":                     # 8km map
+        x_max = MAX_MAP_SIZE
+        y_max = x_max
+        map_img = imread("miramar.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
     elif mapName == "DihorOtok_Main":                   # 6km map
         x_max = MAX_MAP_SIZE * (3/4)
         y_max = x_max
+        map_img = imread("vikendi.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 6.0, 0.0, 6.0])
 
     first_launch, last_launch = get_flight_data(telemetry)
 
@@ -176,24 +237,28 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         ax = fig.add_subplot(fig_x, fig_y, fig_num)
 
         # plot first and last jump locations
-        ax.scatter(launch_x[0] / CM_TO_KM, launch_y[0] / CM_TO_KM, s=100,  color='green', edgecolors='black')
-        ax.scatter(launch_x[1] / CM_TO_KM, launch_y[1] / CM_TO_KM, s=100, color='red', edgecolors='black')
+        ax.scatter(launch_x[0] / CM_TO_KM, launch_y[0] / CM_TO_KM, s=100,
+                   color='green', edgecolors='black', zorder=1)
+        ax.scatter(launch_x[1] / CM_TO_KM, launch_y[1] / CM_TO_KM, s=100,
+                   color='red', edgecolors='black', zorder=1)
 
         # plot line between them
         ax.plot([x_ / CM_TO_KM for x_ in launch_x],
-                [y_ / CM_TO_KM for y_ in launch_y], 'grey', linestyle='--', marker='')
+                [y_ / CM_TO_KM for y_ in launch_y], 'grey', linestyle='--', marker='', zorder=1)
 
         # plot each player according to their ranking
         for ranking in rankings:
             landing_loc = landings[ranking['name']]
-            print("Player {} landing at position\t ({}, {}) and ended up rank : {}".format(ranking['name'],
-                                                                                       landing_loc[0],
-                                                                                       landing_loc[1],
-                                                                                       ranking['ranking']))
+           # print("Player {} landing at position\t ({}, {}) and ended up rank : {}".format(ranking['name'],
+            #                                                                           landing_loc[0],
+             #                                                                          landing_loc[1],
+             #                                                                          ranking['ranking']))
             if ranking['ranking'] == 1:
-                ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM, color='yellow', edgecolors='black')
+                ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM,
+                           color='yellow', edgecolors='black', zorder=1)
             else:
-                ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM, color='blue', alpha=1/ranking['ranking'])
+                ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM,
+                           color='blue', alpha=1/ranking['ranking'], zorder=1)
         plt.ylim(0, y_max)
         plt.xlim(0, x_max)
         plt.xlabel('km')
@@ -203,6 +268,7 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         plt.show()
     else:
         print("Could not get launch data")
+
 
 def main():
     data_dir = ".\\data\\"
@@ -216,9 +282,14 @@ def main():
             telemetry_files.append(file)
 
     # Plots each match landing locations on a new plot
-    for match_num in range(0, 20):
+    for match_num in range(0, len(telemetry_files)):
         telemetry = load_pickle(data_dir + telemetry_files[match_num])
-        display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
+        first, last = get_flight_data(telemetry)
+        if first is not None:
+            flight_vec = get_flight_vector(first, last)
+            dir = get_flight_category(flight_vec)
+            print("{} ==> {}".format(flight_vec, dir))
+        #display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
 
 if __name__ == "__main__":
     main()
