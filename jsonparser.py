@@ -196,6 +196,19 @@ def get_flight_category(flight_vector):
     return dirs_df['direction'].loc[dirs_df['angle_from_path'].idxmin()]
 
 
+# Convert raw (x, y) coordinates to the category
+# Maps are divided into a 20x20 grid of square_size x square_size blocks
+# where each square can be represented by a letter for the x and y position of that
+# square in the map, e.g. AA for the top left corner of the map
+def get_loc_cat(x, y, map_dim):
+    square_size = 0.05 * map_dim
+    x_ = x // square_size
+    y_ = y // square_size
+
+    # add the number square along each access to 'A's ascii code and return the characters
+    # as the category
+    return chr(65 + int(x_)) + chr(65 + int(y_))
+
 # Plot the drop locations of each player (in blue), with opacity in relation to their rank in that match
 # (more opaque = lower rank), along with the location the first person left the plane (in green)
 # and the last person to leave the plane (in red)
@@ -270,6 +283,55 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         print("Could not get launch data")
 
 
+def build_drop_data(telemetry_files):
+    data_dir = ".\\data\\"
+    drop_data = []
+
+    # Plots each match landing locations on a new plot
+    for match_num in range(0, len(telemetry_files)):
+        # If the filesize is greater than 0, ie there is actual data in it
+        if os.path.getsize(data_dir + telemetry_files[match_num]) > 0:
+            telemetry = load_pickle(data_dir + telemetry_files[match_num])
+            first, last = get_flight_data(telemetry)
+            map_name = get_map(telemetry)
+
+            # Set map_size (in cm, like player locations)
+            if map_name == "Savage_Main":  # 4km map
+                map_size = 400000
+            elif map_name == "Erangel_Main":  # 8km map
+                map_size = 800000
+            elif map_name == "Desert_Main":  # 8km map
+                map_size = 800000
+            elif map_name == "DihorOtok_Main":  # 6km map
+                map_size = 600000
+
+            # Get the flight direction
+            if first is not None:
+                flight_vec = get_flight_vector(first, last)
+                dir = get_flight_category(flight_vec)
+
+            # Get the landings
+            landing_locs = get_all_landings(telemetry)
+            rankings = get_rankings(telemetry)
+
+
+            for player, loc in landing_locs.items():
+                # For each player who dropped, get their rank from the rankings array
+                loc_category = get_loc_cat(loc[0], loc[1], map_size)
+                for ranking in rankings:
+                    if player in ranking.values():
+                        player_rank = ranking['ranking']
+
+                drop_data.append({'player': player,
+                                  'drop_loc_raw': loc,
+                                  'drop_loc_cat': loc_category,
+                                  'rank': player_rank,
+                                  'flight_path': dir})
+                #print("{} ==> {}".format(flight_vec, dir))
+            #display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
+
+    return pd.DataFrame(drop_data)
+
 def main():
     data_dir = ".\\data\\"
     matche_files = []
@@ -281,15 +343,8 @@ def main():
         elif "_telemetry" in file:
             telemetry_files.append(file)
 
-    # Plots each match landing locations on a new plot
-    for match_num in range(0, len(telemetry_files)):
-        telemetry = load_pickle(data_dir + telemetry_files[match_num])
-        first, last = get_flight_data(telemetry)
-        if first is not None:
-            flight_vec = get_flight_vector(first, last)
-            dir = get_flight_category(flight_vec)
-            print("{} ==> {}".format(flight_vec, dir))
-        #display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
+    drop_data = build_drop_data(telemetry_files)
+    print(drop_data.head())
 
 if __name__ == "__main__":
     main()
