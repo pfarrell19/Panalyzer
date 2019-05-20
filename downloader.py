@@ -90,7 +90,8 @@ def handle_telemetry(telemetry_queue):
         match_data_file = Path(match_file_name)
         if match_data_file.is_file():
             logging.info("Match id %s already saved to disk, skipping file write", match_object.match_id)
-        else:
+        else: # TODO: Break this out into separate function so it can be used by jsonparser.py to overwrite pickles with new data
+            # TODO: Make sure this overwrites and does not append
             logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
             telemetry_file_name = "data/" + match_object.match_id + "_telemetry.pickle"
