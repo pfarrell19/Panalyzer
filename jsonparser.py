@@ -19,7 +19,6 @@ MAX_MAP_SIZE = 8            # In KM
 # end_range:    ending time 
 # event_type:   type of event (eg. 'LogParachuteLanding')
 def search(json_object, player_id=None, start_range=None, end_range=None, event_type=None):
-    # TODO
     events = []
     i = 0
     for entry in json_object: 
@@ -346,19 +345,25 @@ def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
 
     return pd.DataFrame(drop_data)
 
-def getSafeZoneStates(json_object):
-    logGameStates = search(None, None, None, 'LogGameStatePeriodic')
-    newStateObj = {}
-    for gameState in LogGameStates:
+# Get safe zone and poison zone states (location and radius) throughout the game
+# Returns list of dictionaries representing each time & states
+# [ { '_D': str,
+#     'safetyZonePosition' : {location},
+#     'safetyZoneRadius' : int, 
+#       ... }, ... ]
+def getZoneStates(json_object):
+    logGameStates = search(json_object, None, None, None, 'LogGameStatePeriodic')
+    allStates = []
+    for gameState in logGameStates:
         timestamp = gameState['_D']
         state = gameState['gameState']
-        newStateObj = {k : gameState[k] for k in ('safetyZonePosition', 
+        newStateObj = {k : state[k] for k in ('safetyZonePosition', 
                                                     'safetyZoneRadius', 
                                                     'poisonGasWarningPosition',
                                                     'poisonGasWarningRadius')}
         newStateObj['_D'] = timestamp
-
-    return newStateObj
+        allStates.append(newStateObj)
+    return allStates
 
 def main():
     data_dir = ".\\data\\"
@@ -380,9 +385,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
-    with open('6dbb4eaa-5e66-11e9-ac1a-0a5864649927-telemetry.json') as json_file:
-        data = json.load(json_file)
-        getSafeZoneStates(data)
-
-
+    main()
