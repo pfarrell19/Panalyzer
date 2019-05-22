@@ -1,11 +1,12 @@
 import pickle
 import os
-import json
 import matplotlib.pyplot as plt
-from scipy.misc import imread
+from imageio import imread
 import math
 import numpy as np
 import pandas as pd
+import logging
+import downloader
 
 # TODO: remove global...
 CM_TO_KM = 100000           # CM in a KM
@@ -289,18 +290,23 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         plt.savefig('.\\match_landings\\match_{}.png'.format(match_num))
         plt.show()
     else:
-        print("Could not get launch data")
+        logging.error("Could not get launch data")
 
 
-def build_drop_data(telemetry_files):
+def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
     data_dir = ".\\data\\"
     drop_data = []
 
     # Plots each match landing locations on a new plot
     for match_num in range(0, len(telemetry_files)):
+        logging.debug("Building match %i of %i", match_num, len(telemetry_files) - 1)
         # If the filesize is greater than 0, ie there is actual data in it
         if os.path.getsize(data_dir + telemetry_files[match_num]) > 0:
-            telemetry = load_pickle(data_dir + telemetry_files[match_num])
+            try:
+                telemetry = load_pickle(data_dir + telemetry_files[match_num])
+            except EOFError:
+                logging.error("Match file terminated unexpectedly, skipping")
+                continue  # Skip processing files that terminate early
             first, last = get_flight_data(telemetry)
             map_name = get_map(telemetry)
 
@@ -346,10 +352,14 @@ def main():
     match_files = []
     telemetry_files = []
 
+    downloader.setup_logging()
+    logging.info("Scanning for match and telemetry files in %s to parse", data_dir)
     for file in os.listdir(data_dir):
         if "_match" in file:
+            logging.debug("Match file %s found, adding as match", file)
             match_files.append(file)
         elif "_telemetry" in file:
+            logging.debug("Telemetry file %s found, adding as match", file)
             telemetry_files.append(file)
 
     drop_data = build_drop_data(telemetry_files)
