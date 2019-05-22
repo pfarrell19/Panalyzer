@@ -346,6 +346,19 @@ def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
 
     return pd.DataFrame(drop_data)
 
+def getSafeZoneStates(json_object):
+    logGameStates = search(None, None, None, 'LogGameStatePeriodic')
+    newStateObj = {}
+    for gameState in LogGameStates:
+        timestamp = gameState['_D']
+        state = gameState['gameState']
+        newStateObj = {k : gameState[k] for k in ('safetyZonePosition', 
+                                                    'safetyZoneRadius', 
+                                                    'poisonGasWarningPosition',
+                                                    'poisonGasWarningRadius')}
+        newStateObj['_D'] = timestamp
+
+    return newStateObj
 
 def main():
     data_dir = ".\\data\\"
@@ -367,4 +380,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+    with open('6dbb4eaa-5e66-11e9-ac1a-0a5864649927-telemetry.json') as json_file:
+        data = json.load(json_file)
+        getSafeZoneStates(data)
+
+
