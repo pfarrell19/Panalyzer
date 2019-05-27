@@ -1,7 +1,7 @@
 import pandas as pd
 from pandas.io.json import json_normalize
 import requests
-import gzip 
+import gzip
 import shutil
 import os
 import time
@@ -14,6 +14,7 @@ import pickle
 from threading import Thread
 from pathlib import Path
 
+
 class API_Key:
     def __init__(self, key_string):
         self.key_string = key_string
@@ -21,10 +22,12 @@ class API_Key:
         self.limit_remaining = -1
         self.limit_reset = -1
 
+
 class Match_Samples_Response:
     def __init__(self, response_code):
         self.response_code = response_code
         self.match_ids = []
+
 
 def main():
     api_keys_filename = "api_keys.txt"
@@ -75,11 +78,12 @@ def main():
         new_thread = Thread(target=handle_telemetry, args=(telemetry_queue,))
         new_thread.daemon = True
         new_thread.start()
-    for count, match in enumerate(match_id_queue):
+    for count, current_match in enumerate(match_id_queue):
         logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
-        match_object = get_match_stats(match)
+        match_object = get_match_stats(current_match)
         telemetry_queue.put(match_object)
     telemetry_queue.join()
+
 
 def handle_telemetry(telemetry_queue):
     logging.info("Worker thread active")
@@ -94,12 +98,17 @@ def handle_telemetry(telemetry_queue):
             logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
             telemetry_file_name = "data/" + match_object.match_id + "_telemetry.pickle"
-            with open(telemetry_file_name, 'wb') as output_file:
-                logging.debug("Outputting telemetry contents into %s", telemetry_file_name)
-                pickle.dump(parsed_telemetry, output_file, pickle.HIGHEST_PROTOCOL)
-            with open(match_file_name, 'wb') as output_file:
-                logging.debug("Outputting match contents into %s", match_file_name)
-                pickle.dump(match_object, output_file, pickle.HIGHEST_PROTOCOL)
+            write_pickle(telemetry_file_name, parsed_telemetry)
+            write_pickle(match_file_name, match_object)
+
+
+# Writes any object into a pickle file so it can be loaded later
+# TODO: Allow jsonparser to update these
+def write_pickle(file_path, object_to_pickle):
+    with open(file_path, 'wb') as output_file:  # Write to file, truncating (not appending), in binary output mode
+        logging.debug("Writing object into file %s", file_path)
+        pickle.dump(object_to_pickle, output_file, pickle.HIGHEST_PROTOCOL)
+
 
 # Get a list of random match IDs from the PUBG API
 def get_sample_matches(api_key):
@@ -112,7 +121,7 @@ def get_sample_matches(api_key):
     # Get the API call data
     api_result = requests.get("https://api.pubg.com/shards/steam/samples", headers=header)
     api_key.limit_remaining = api_result.headers.get("X-Ratelimit-Remaining")
-    api_key.limit_qty = api_result.headers.get("X-Ratelimit-Limit")
+    api_key.limit_max = api_result.headers.get("X-Ratelimit-Limit")
     api_key.limit_reset = api_result.headers.get("X-Ratelimit-Reset")
     sample_matches = Match_Samples_Response(api_result.status_code)
 
@@ -164,10 +173,10 @@ def get_match_stats(match_id):
 
     # Extract match statistics and create a match object
     game_mode = api_response_data_dataframe.loc['gameMode', 'attributes']
-    map = api_response_data_dataframe.loc['mapName', 'attributes']
+    game_map = api_response_data_dataframe.loc['mapName', 'attributes']
     start_time = api_response_data_dataframe.loc['createdAt', 'attributes']
     duration = api_response_data_dataframe.loc['duration', 'attributes']
-    match_data_object = match.match(match_id, game_mode, map, start_time, duration, telemetry_url)
+    match_data_object = match.match(match_id, game_mode, game_map, start_time, duration, telemetry_url)
     return match_data_object
 
 
@@ -178,11 +187,11 @@ def get_telemetry(telemetry_url):
     parsed_telemetry = json.loads(response.text)
     return parsed_telemetry
 
+
 # Given location of gzips and location of where to extract to -> unzips gzip files
-def extract_gzip(gzip_indir, gzip_outdir): 
-    
+def extract_gzip(gzip_indir, gzip_outdir):
     # Check if directories exist
-    if not os.path.isdir(gzip_indir): 
+    if not os.path.isdir(gzip_indir):
         print("Cannot find directory '" + gzip_indir + "'")
         exit()
     elif not os.path.isdir(gzip_outdir):
@@ -191,20 +200,20 @@ def extract_gzip(gzip_indir, gzip_outdir):
 
     # Get name of all files to unzip
     files = os.listdir(gzip_indir)
-    for f in files: 
-        outfile  = f.replace(".gz", "")
-        try: 
+    for f in files:
+        outfile = f.replace(".gz", "")
+        try:
             with gzip.open(gzip_indir + f, 'rb') as g:
                 print("Copying '" + f + "'")
 
                 # Copy files to output directory
-                with open(gzip_outdir + outfile, 'wb') as g_copy: 
+                with open(gzip_outdir + outfile, 'wb') as g_copy:
                     shutil.copyfileobj(g, g_copy)
-
-        except: 
+        except IOError:
             print("Unable to copy file '" + gzip_indir + f + "'\n")
 
     print("Copying data - done")
 
-if __name__== "__main__":
+
+if __name__ == "__main__":
     main()
