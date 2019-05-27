@@ -15,7 +15,7 @@ from threading import Thread
 from pathlib import Path
 
 
-class API_Key:
+class APIKey:
     def __init__(self, key_string):
         self.key_string = key_string
         self.limit_max = -1
@@ -23,7 +23,7 @@ class API_Key:
         self.limit_reset = -1
 
 
-class Match_Samples_Response:
+class MatchSamplesResponse:
     def __init__(self, response_code):
         self.response_code = response_code
         self.match_ids = []
@@ -32,23 +32,14 @@ class Match_Samples_Response:
 def main():
     api_keys_filename = "api_keys.txt"
     download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
-
-    # Set up logging
-    logging.debug("Setting up logging")
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    root.addHandler(handler)
+    setup_logging()
 
     # Get API keys
     logging.debug("Getting API keys from file %s", api_keys_filename)
     api_keys = []
     with open(api_keys_filename) as api_keys_file:
         for key in api_keys_file:
-            api_keys.append(API_Key(key.rstrip()))
+            api_keys.append(APIKey(key.rstrip()))
 
     # Get matches and test keys
     logging.debug("Cycling through API keys to retrieve sample set of match ids")
@@ -86,25 +77,46 @@ def main():
 
 
 def handle_telemetry(telemetry_queue):
-    logging.info("Worker thread active")
+    logging.info("Downloader thread active")
     while True:
         match_object = telemetry_queue.get()
+        # patch_version = match_object.patch_version
+        match_date = match_object.start_time[:10]
+        map_name = match_object.map
+
         # Save telemetry if it's new
-        match_file_name = "data/" + match_object.match_id + "_match.pickle"
+        match_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id + "_match.pickle"
         match_data_file = Path(match_file_name)
         if match_data_file.is_file():
             logging.info("Match id %s already saved to disk, skipping file write", match_object.match_id)
-        else:
+        else:  # TODO: Downloads not appearing
             logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
-            telemetry_file_name = "data/" + match_object.match_id + "_telemetry.pickle"
-            write_pickle(telemetry_file_name, parsed_telemetry)
+            telemetry_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id\
+                                  + "_telemetry.pickle"
             write_pickle(match_file_name, match_object)
+            write_pickle(telemetry_file_name, parsed_telemetry)
+
+
+def setup_logging():
+    logging.debug("Setting up logging")
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
 
 
 # Writes any object into a pickle file so it can be loaded later
 # TODO: Allow jsonparser to update these
 def write_pickle(file_path, object_to_pickle):
+    if not os.path.exists(os.path.dirname(file_path)):
+        try:
+            os.makedirs(os.path.dirname(file_path))
+        except OSError:
+            logging.error("Could not create directory for pickle at path %s", file_path)
     with open(file_path, 'wb') as output_file:  # Write to file, truncating (not appending), in binary output mode
         logging.debug("Writing object into file %s", file_path)
         pickle.dump(object_to_pickle, output_file, pickle.HIGHEST_PROTOCOL)
@@ -123,7 +135,7 @@ def get_sample_matches(api_key):
     api_key.limit_remaining = api_result.headers.get("X-Ratelimit-Remaining")
     api_key.limit_max = api_result.headers.get("X-Ratelimit-Limit")
     api_key.limit_reset = api_result.headers.get("X-Ratelimit-Reset")
-    sample_matches = Match_Samples_Response(api_result.status_code)
+    sample_matches = MatchSamplesResponse(api_result.status_code)
 
     if api_result.status_code == 200:
         logging.info("Received sample matches (HTTP status code 200), extracting match ids")
@@ -176,6 +188,7 @@ def get_match_stats(match_id):
     game_map = api_response_data_dataframe.loc['mapName', 'attributes']
     start_time = api_response_data_dataframe.loc['createdAt', 'attributes']
     duration = api_response_data_dataframe.loc['duration', 'attributes']
+    #patch_version = api_response_data_dataframe.loc['patchVersion', 'attributes']
     match_data_object = match.match(match_id, game_mode, game_map, start_time, duration, telemetry_url)
     return match_data_object
 
