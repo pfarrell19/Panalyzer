@@ -209,7 +209,7 @@ def get_flight_category(flight_vector):
 # Convert raw (x, y) coordinates to the category
 # Maps are divided into a 20x20 grid of square_size x square_size blocks
 # where each square can be represented by a letter for the x and y position of that
-# square in the map, e.g. AA for the top left corner of the map
+# square in the map, e.g. AA for the square containing (0, 0)
 def get_loc_cat(x, y, map_dim):
     square_size = 0.05 * map_dim
     x_ = x // square_size
@@ -339,7 +339,8 @@ def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
                                   'drop_loc_raw': loc,
                                   'drop_loc_cat': loc_category,
                                   'rank': player_rank,
-                                  'flight_path': dir})
+                                  'flight_path': dir,
+                                  'map': map_name})
                 #print("{} ==> {}".format(flight_vec, dir))
             #display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
 
