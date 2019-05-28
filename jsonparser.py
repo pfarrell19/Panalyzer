@@ -12,6 +12,7 @@ import logging
 import downloader
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
+import json
 
 # TODO: remove global...
 CM_TO_KM = 100000           # CM in a KM
@@ -426,7 +427,8 @@ def getZoneStates(json_object):
                                               'poisonGasWarningRadius')}
         newStateObj['_D'] = timestamp
         allStates.append(newStateObj)
-    return allStates
+    return pd.DataFrame(allStates)
+
 def get_drop_data():
     data_dir = "./data/"
     match_files = []
@@ -444,6 +446,7 @@ def get_drop_data():
 
     drop_data = build_drop_data(telemetry_files)
     return drop_data
+
 def main():
     drop_data = get_drop_data()
     map_savage_data = preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
