@@ -85,15 +85,17 @@ def handle_telemetry(telemetry_queue):
         map_name = match_object.map
 
         # Save telemetry if it's new
-        match_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id + "_match.pickle"
+        #match_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id + "_match.pickle"
+        match_file_name = "data/" + match_object.match_id + "_match.pickle"
         match_data_file = Path(match_file_name)
         if match_data_file.is_file():
             logging.info("Match id %s already saved to disk, skipping file write", match_object.match_id)
         else:  # TODO: Downloads not appearing
             logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
-            telemetry_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id\
-                                  + "_telemetry.pickle"
+            # telemetry_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id\
+            #                       + "_telemetry.pickle"
+            telemetry_file_name = "data/" + match_object.match_id + "_telemetry.pickle"
             write_pickle(match_file_name, match_object)
             write_pickle(telemetry_file_name, parsed_telemetry)
 

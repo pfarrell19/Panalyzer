@@ -10,25 +10,27 @@ from sklearn.model_selection import train_test_split, cross_val_score, cross_val
 import math
 import logging
 import downloader
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import LabelEncoder
 
 # TODO: remove global...
 CM_TO_KM = 100000           # CM in a KM
 MAX_MAP_SIZE = 8            # In KM
 
 
-# search for specific attributes 
+# search for specific attributes
 # player_id :   players acount id (eg. 'acount.*****')
 # start_range : starting time (eg. 'YYYY-MM-DDTHH:MM:SS.SSSZ')
-# end_range:    ending time 
+# end_range:    ending time
 # event_type:   type of event (eg. 'LogParachutepiLanding')
 def search(json_object, player_id=None, start_range=None, end_range=None, event_type=None):
     events = []
     i = 0
-    for entry in json_object: 
+    for entry in json_object:
         if (is_event(entry, event_type) and
                 in_range(entry['_D'], start_range, end_range) and
                 has_player(entry, player_id)):
-            
+
             events.append(entry)
     return events
 
@@ -61,10 +63,10 @@ def is_after(time1, time2):
 
     for x in range(3):
         if int(date1[x]) > int(date2[x]):
-                return True
+            return True
     for x in range(2):
         if int(time1[x]) > int(time2[x]):
-                return True
+            return True
 
     if float(time1[2]) > float(time2[2]):
         return True
@@ -274,10 +276,10 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         # plot each player according to their ranking
         for ranking in rankings:
             landing_loc = landings[ranking['name']]
-           # print("Player {} landing at position\t ({}, {}) and ended up rank : {}".format(ranking['name'],
+            # print("Player {} landing at position\t ({}, {}) and ended up rank : {}".format(ranking['name'],
             #                                                                           landing_loc[0],
-             #                                                                          landing_loc[1],
-             #                                                                          ranking['ranking']))
+            #                                                                          landing_loc[1],
+            #                                                                          ranking['ranking']))
             if ranking['ranking'] == 1:
                 ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM,
                            color='yellow', edgecolors='black', zorder=1)
@@ -289,7 +291,7 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         plt.xlabel('km')
         plt.ylabel('km')
         plt.title(map_name)
-        plt.savefig('.\\match_landings\\match_{}.png'.format(match_num))
+        plt.savefig('./match_landings/match_{}.png'.format(match_num))
         plt.show()
     else:
         logging.error("Could not get launch data")
@@ -297,7 +299,7 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
 
 
 def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
-    data_dir = ".\\data\\"
+    data_dir = "./data/"
     drop_data = []
 
     # Plots each match landing locations on a new plot
@@ -365,35 +367,43 @@ def train_model(df, max_k):
 
     max_score = max(k_scores)
 
-    # get the arg max of the score array to determine the optimnal value for k
-    k_opt = [i for i in k_scores if i == max_score][0]
+    #     get the arg max of the score array to determine the optimnal value for k
+    k_opt = None
+    for i in range(len(k_scores)):
+        if k_scores[i] == max_score:
+            k_opt = i + 1
 
     knn = KNeighborsClassifier(n_neighbors=k_opt)
     kf = KFold(n_splits=10)
 
-   # split the training data into different validation folds and run a training loop on it
+    # split the training data into different validation folds and run a training loop on it
 
     kf.get_n_splits(x_train)
     training_scores = []
-    for train_index, test_index in kf.split(x_train):
-        X_train = x_train[train_index]
-        X_test = x_train[test_index]
 
-        Y_train = y_train[train_index]
-        Y_test = y_train[test_index]
-        knn.fit(X_train, Y_train)
 
-        training_scores.append((knn.predict(X_test) - Y_test).mean())
-    print("TRAINING ACCURACY SCORES: ", training_scores)
-    print("MEAN TRAINING ACCURACY: ", sum(training_scores) / len(training_scores))
+    knn.fit(x_train, y_train)#we get about -2.something places per map accuracy
     testing_accuracy = (knn.predict(x_test) - y_test).mean()
     print("TESTING ACCURACY: ", testing_accuracy)
     return knn
 
 
 
-
-
+# preprocess the dataframe
+def preprocess_data(drop_data):
+    drop_data = drop_data.dropna()
+    drop_data = drop_data.drop(columns = ['drop_loc_raw'])
+    drop_data = drop_data.drop(columns = ['player'])#probably don't need to include the player in the model
+    drop_data = drop_data.dropna()
+    labelencoder_X=LabelEncoder()
+    X = drop_data.iloc[:,:].values
+    drop_data['drop_loc_cat'] = labelencoder_X.fit_transform(X[:, 0])
+    drop_data['flight_path'] = labelencoder_X.fit_transform(X[:, 1])
+    drop_data['map'] = labelencoder_X.fit_transform(X[:, 2])
+    drop_data = drop_data[drop_data['rank'] <= 20]
+    scaler = MinMaxScaler()
+    drop_data.loc[:,:-1] = scaler.fit_transform(drop_data[drop_data.columns[:-1]])
+    return drop_data
 
 
 
@@ -402,7 +412,7 @@ def train_model(df, max_k):
 # Returns list of dictionaries representing each time & states
 # [ { '_D': str,
 #     'safetyZonePosition' : {location},
-#     'safetyZoneRadius' : int, 
+#     'safetyZoneRadius' : int,
 #       ... }, ... ]
 def getZoneStates(json_object):
     logGameStates = search(json_object, None, None, None, 'LogGameStatePeriodic')
@@ -410,16 +420,15 @@ def getZoneStates(json_object):
     for gameState in logGameStates:
         timestamp = gameState['_D']
         state = gameState['gameState']
-        newStateObj = {k : state[k] for k in ('safetyZonePosition', 
-                                                    'safetyZoneRadius', 
-                                                    'poisonGasWarningPosition',
-                                                    'poisonGasWarningRadius')}
+        newStateObj = {k : state[k] for k in ('safetyZonePosition',
+                                              'safetyZoneRadius',
+                                              'poisonGasWarningPosition',
+                                              'poisonGasWarningRadius')}
         newStateObj['_D'] = timestamp
         allStates.append(newStateObj)
     return allStates
-
-def main():
-    data_dir = ".\\data\\"
+def get_drop_data():
+    data_dir = "./data/"
     match_files = []
     telemetry_files = []
 
@@ -434,7 +443,23 @@ def main():
             telemetry_files.append(file)
 
     drop_data = build_drop_data(telemetry_files)
-    print(drop_data.head())
+    return drop_data
+def main():
+    drop_data = get_drop_data()
+    map_savage_data = preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
+    map_erangel_data = preprocess_data(drop_data[drop_data["map"] == "Erangel_Main"])
+    map_desert_data = preprocess_data(drop_data[drop_data['map'] == 'Desert_Main'])
+    max_k = 20# training model hyperparam, anything above this doesn't tell us much
+
+    print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
+    print("PRINTING SAVAGE_MAIN RESULTS: ")
+    train_model(map_savage_data, max_k)
+    print("PRINTING ERANGEL_MAIN RESULTS: ")
+    train_model(map_erangel_data, max_k)
+    print("PRINTING DESERT_MAIN RESULTS: ")
+    train_model(map_desert_data, max_k)
+
+    print("###########DONE PRINTING DROP LOCATIONS PREDICTIONS###########\n\n")
 
 
 if __name__ == "__main__":
