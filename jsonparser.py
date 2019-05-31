@@ -23,7 +23,7 @@ MAX_MAP_SIZE = 8            # In KM
 # player_id :   players acount id (eg. 'acount.*****')
 # start_range : starting time (eg. 'YYYY-MM-DDTHH:MM:SS.SSSZ')
 # end_range:    ending time
-# event_type:   type of event (eg. 'LogParachutepiLanding')
+# event_type:   list of type of event (eg. ['LogParachutepiLanding'])
 def search(json_object, player_id=None, start_range=None, end_range=None, event_type=None):
     events = []
     i = 0
@@ -95,7 +95,7 @@ def is_event(event, event_type):
     if event_type is None:
         return True
     else:
-        return event_type == event['_T']
+        return event['_T'] in event_type
 
 
 # Return the dict from the pickle file name
@@ -413,7 +413,7 @@ def preprocess_data(drop_data):
 # Returns dataframe for each time & states
 # columns: ['_D', 'safetyZonePosition_x', 'safetyZonePosition_y', 'safetyZoneRadius', ...]
 def getZoneStates(json_object):
-    logGameStates = search(json_object, None, None, None, 'LogGameStatePeriodic')
+    logGameStates = search(json_object, None, None, None, ['LogGameStatePeriodic'])
     allStates = []
     for gameState in logGameStates:
         timestamp = gameState['_D']
@@ -431,6 +431,31 @@ def getZoneStates(json_object):
         allStates.append(newStateObj)
     df = pd.DataFrame(allStates)
     return df
+
+# Get items picked up (house, crate, loot, etc) and by whom
+# Returns dataframe for each pickup log
+# columns: ['character_accountId', 'character_name', 'item_category', ...]
+def getItemPickup(json_object):
+    itemPicks = search(json_object, 
+                        None, 
+                        None, 
+                        None,   
+                        ['LogItemPickup', 
+                                'LogItemPickupFromCarepackage', 
+                                'LogItemPickupFromLootBox'])
+    parsed_data = []
+    for log in itemPicks:
+        char = log['character']
+        item = log['item']
+        pickupState = {
+                    'character_accountId' : char['accountId'],
+                    'character_name' : char['name'],
+                    'item_category' : item['category'], 
+                    'item_subCategory' : item['subCategory'],
+                    'item_Id' : item['itemId']}
+        parsed_data.append(pickupState)
+    return pd.DataFrame(parsed_data)
+
 
 def get_drop_data():
     data_dir = "./data/"
