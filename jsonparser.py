@@ -448,6 +448,7 @@ def getItemPickup(json_object):
         char = log['character']
         item = log['item']
         pickupState = {
+                    '_D' : log['_D'],
                     'character_accountId' : char['accountId'],
                     'character_name' : char['name'],
                     'item_category' : item['category'], 
