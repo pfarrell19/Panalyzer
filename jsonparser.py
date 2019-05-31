@@ -410,24 +410,27 @@ def preprocess_data(drop_data):
 
 
 # Get safe zone and poison zone states (location and radius) throughout the game
-# Returns list of dictionaries representing each time & states
-# [ { '_D': str,
-#     'safetyZonePosition' : {location},
-#     'safetyZoneRadius' : int,
-#       ... }, ... ]
+# Returns dataframe for each time & states
+# columns: ['_D', 'safetyZonePosition_x', 'safetyZonePosition_y', 'safetyZoneRadius', ...]
 def getZoneStates(json_object):
     logGameStates = search(json_object, None, None, None, 'LogGameStatePeriodic')
     allStates = []
     for gameState in logGameStates:
         timestamp = gameState['_D']
         state = gameState['gameState']
-        newStateObj = {k : state[k] for k in ('safetyZonePosition',
-                                              'safetyZoneRadius',
-                                              'poisonGasWarningPosition',
+        newStateObj = {k : state[k] for k in ('safetyZoneRadius',
                                               'poisonGasWarningRadius')}
+        safePos = state['safetyZonePosition']
+        poisPos = state['poisonGasWarningPosition']
+
+        newStateObj['safetyZonePosition_x'] = safePos['x']
+        newStateObj['safetyZonePosition_y'] = safePos['y']
         newStateObj['_D'] = timestamp
+        newStateObj['poisonGasWarningPosition_x'] = poisPos['x']
+        newStateObj['poisonGasWarningPosition_y'] = poisPos['y']
         allStates.append(newStateObj)
-    return pd.DataFrame(allStates)
+    df = pd.DataFrame(allStates)
+    return df
 
 def get_drop_data():
     data_dir = "./data/"
