@@ -383,8 +383,12 @@ def train_model(df, max_k):
 
 
     knn.fit(x_train, y_train)#we get about -2.something places per map accuracy
-    testing_accuracy = (knn.predict(x_test) - y_test).mean()
-    print("TESTING ACCURACY: ", testing_accuracy)
+    # testing_accuracy = (knn.predict(x_test) - y_test).mean()
+
+    predictions = knn.predict(x_test)
+    correct_predictions = predictions[predictions == y_test]
+
+    print("TESTING ACCURACY: ", len(correct_predictions) / len(predictions))
     return knn
 
 
@@ -392,15 +396,16 @@ def train_model(df, max_k):
 # preprocess the dataframe
 def preprocess_data(drop_data):
     drop_data = drop_data.dropna()
-    drop_data = drop_data.drop(columns = ['drop_loc_raw'])
     drop_data = drop_data.drop(columns = ['player'])#probably don't need to include the player in the model
+    drop_data = drop_data.drop(columns = ['drop_loc_raw'])#probably don't need to include the player in the model
     drop_data = drop_data.dropna()
+    drop_data = drop_data[drop_data['rank'] <= 5]
     labelencoder_X=LabelEncoder()
     X = drop_data.iloc[:,:].values
-    drop_data['drop_loc_cat'] = labelencoder_X.fit_transform(X[:, 0])
     drop_data['flight_path'] = labelencoder_X.fit_transform(X[:, 1])
     drop_data['map'] = labelencoder_X.fit_transform(X[:, 2])
-    drop_data = drop_data[drop_data['rank'] <= 20]
+    drop_data = drop_data.drop(columns = ['rank'])
+    drop_data = drop_data[['flight_path', 'map', 'drop_loc_cat']]
     scaler = MinMaxScaler()
     drop_data.loc[:,:-1] = scaler.fit_transform(drop_data[drop_data.columns[:-1]])
     return drop_data
@@ -444,6 +449,7 @@ def get_drop_data():
 
     drop_data = build_drop_data(telemetry_files)
     return drop_data
+
 def main():
     drop_data = get_drop_data()
     map_savage_data = preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
