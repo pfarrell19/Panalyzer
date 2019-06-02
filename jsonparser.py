@@ -5,13 +5,10 @@ from imageio import imread
 import math
 import numpy as np
 import pandas as pd
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, KFold
 import math
 import logging
 import downloader
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import LabelEncoder
+import recommender as rec
 import json
 
 # TODO: remove global...
@@ -298,9 +295,8 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         logging.error("Could not get launch data")
 
 
-
 def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
-    data_dir = "./data/"
+    data_dir = ".\\data\\"
     drop_data = []
 
     # Plots each match landing locations on a new plot
@@ -353,66 +349,6 @@ def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
 
     return pd.DataFrame(drop_data)
 
-# note that I am assuming the target is in the last position of the dataframe
-# additionally, I am assuming that the list has already been filtered(ie. we are only training on the top players)
-# additionally, my current assumption is the data has already been transformed into non-categorical data
-def train_model(df, max_k):
-    X = df.iloc[:, :-1].copy()#assuming our target is at the very end of the dataframe
-    y = df.iloc[:, -1].copy()
-    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size= .2)
-    k_scores = []
-    for k in range(1,max_k):
-        knn = KNeighborsClassifier(n_neighbors=k)
-        cv_scores = cross_val_score(knn, x_train, y_train, cv=10, scoring='accuracy')
-        k_scores.append(cv_scores.mean())
-
-    max_score = max(k_scores)
-
-    #     get the arg max of the score array to determine the optimnal value for k
-    k_opt = None
-    for i in range(len(k_scores)):
-        if k_scores[i] == max_score:
-            k_opt = i + 1
-
-    knn = KNeighborsClassifier(n_neighbors=k_opt)
-    kf = KFold(n_splits=10)
-
-    # split the training data into different validation folds and run a training loop on it
-
-    kf.get_n_splits(x_train)
-    training_scores = []
-
-
-    knn.fit(x_train, y_train)#we get about -2.something places per map accuracy
-    # testing_accuracy = (knn.predict(x_test) - y_test).mean()
-
-    predictions = knn.predict(x_test)
-    correct_predictions = predictions[predictions == y_test]
-
-    print("TESTING ACCURACY: ", len(correct_predictions) / len(predictions))
-    return knn
-
-
-
-# preprocess the dataframe
-def preprocess_data(drop_data):
-    drop_data = drop_data.dropna()
-    drop_data = drop_data.drop(columns = ['player'])#probably don't need to include the player in the model
-    drop_data = drop_data.drop(columns = ['drop_loc_raw'])#probably don't need to include the player in the model
-    drop_data = drop_data.dropna()
-    drop_data = drop_data[drop_data['rank'] <= 5]
-    labelencoder_X=LabelEncoder()
-    X = drop_data.iloc[:,:].values
-    drop_data['flight_path'] = labelencoder_X.fit_transform(X[:, 1])
-    drop_data['map'] = labelencoder_X.fit_transform(X[:, 2])
-    drop_data = drop_data.drop(columns = ['rank'])
-    drop_data = drop_data[['flight_path', 'map', 'drop_loc_cat']]
-    scaler = MinMaxScaler()
-    drop_data.loc[:,:-1] = scaler.fit_transform(drop_data[drop_data.columns[:-1]])
-    return drop_data
-
-
-
 
 # Get safe zone and poison zone states (location and radius) throughout the game
 # Returns dataframe for each time & states
@@ -462,9 +398,9 @@ def getItemPickup(json_object):
         parsed_data.append(pickupState)
     return pd.DataFrame(parsed_data)
 
-
+# Returns a list of DataFrames where each DataFrame contains all of the drop data for a given map and flight path
 def get_drop_data():
-    data_dir = "./data/"
+    data_dir = ".\\data\\"
     match_files = []
     telemetry_files = []
 
@@ -478,23 +414,56 @@ def get_drop_data():
             logging.debug("Telemetry file %s found, adding as match", file)
             telemetry_files.append(file)
 
+    # Get aggregate data
     drop_data = build_drop_data(telemetry_files)
-    return drop_data
+
+    # Split by map and flight path
+    all_data = []
+    map_data_li = split_drop_data_by_map(drop_data)
+    for map_df in map_data_li:
+        flight_data_li = split_drop_data_by_flight_path(map_df)
+        all_data.extend(flight_data_li)
+
+    return all_data
+
+
+# Split the DataFrame containing all of the drop data into separate DataFrames for each map
+def split_drop_data_by_map(drop_data):
+    map_data = []
+    for map in drop_data['map'].unique():
+        map_data.append(drop_data[drop_data['map'] == map])
+    return map_data
+
+# Split the drop data (assumed to already be split by map) by flight path
+def split_drop_data_by_flight_path(drop_data):
+    flight_data = []
+    print(drop_data.columns)
+    for flight in drop_data['flight_path'].unique():
+        flight_data.append(drop_data[drop_data['flight_path'] == flight])
+    print(len(flight_data))
+    return flight_data
 
 def main():
     drop_data = get_drop_data()
-    map_savage_data = preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
-    map_erangel_data = preprocess_data(drop_data[drop_data["map"] == "Erangel_Main"])
-    map_desert_data = preprocess_data(drop_data[drop_data['map'] == 'Desert_Main'])
-    max_k = 20# training model hyperparam, anything above this doesn't tell us much
+
+    for df in drop_data:
+        print("\n", df.iloc[0][['map', 'flight_path']], " - ", df.shape[0], )
+    """
+    map_savage_data = rec.preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
+    map_erangel_data = rec.preprocess_data(drop_data[drop_data["map"] == "Erangel_Main"])
+    map_desert_data = rec.preprocess_data(drop_data[drop_data['map'] == 'Desert_Main'])
+    """
+    max_k = 20              # training model hyperparam, anything above this doesn't tell us much
+
 
     print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
+    rec.train_model(drop_data[0], max_k)
     print("PRINTING SAVAGE_MAIN RESULTS: ")
-    train_model(map_savage_data, max_k)
+    #rec.train_model(map_savage_data, max_k)
     print("PRINTING ERANGEL_MAIN RESULTS: ")
-    train_model(map_erangel_data, max_k)
+    #rec.train_model(map_erangel_data, max_k)
     print("PRINTING DESERT_MAIN RESULTS: ")
-    train_model(map_desert_data, max_k)
+    #rec.train_model(map_desert_data, max_k)
 
     print("###########DONE PRINTING DROP LOCATIONS PREDICTIONS###########\n\n")
 
