@@ -356,20 +356,23 @@ def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
 def getZoneStates(json_object):
     logGameStates = search(json_object, None, None, None, ['LogGameStatePeriodic'])
     allStates = []
+    iterated_states = []
     for gameState in logGameStates:
-        timestamp = gameState['_D']
-        state = gameState['gameState']
-        newStateObj = {k : state[k] for k in ('safetyZoneRadius',
-                                              'poisonGasWarningRadius')}
-        safePos = state['safetyZonePosition']
-        poisPos = state['poisonGasWarningPosition']
+        timestamp = gameState['common']['isGame']
+        if timestamp not in iterated_states:
+            state = gameState['gameState']
+            newStateObj = {k : state[k] for k in ('safetyZoneRadius',
+                                                  'poisonGasWarningRadius')}
+            safePos = state['safetyZonePosition']
+            poisPos = state['poisonGasWarningPosition']
 
-        newStateObj['safetyZonePosition_x'] = safePos['x']
-        newStateObj['safetyZonePosition_y'] = safePos['y']
-        newStateObj['_D'] = timestamp
-        newStateObj['poisonGasWarningPosition_x'] = poisPos['x']
-        newStateObj['poisonGasWarningPosition_y'] = poisPos['y']
-        allStates.append(newStateObj)
+            newStateObj['safetyZonePosition_x'] = safePos['x']
+            newStateObj['safetyZonePosition_y'] = safePos['y']
+            newStateObj['isGame'] = timestamp
+            newStateObj['poisonGasWarningPosition_x'] = poisPos['x']
+            newStateObj['poisonGasWarningPosition_y'] = poisPos['y']
+            allStates.append(newStateObj)
+            iterated_states.append(timestamp)
     df = pd.DataFrame(allStates)
     return df
 
