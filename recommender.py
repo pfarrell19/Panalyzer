@@ -44,7 +44,39 @@ def train_model(df, max_k):
     return knn
 
 
+def player_path_model(df, max_k):
+    #TODO: get x and y from df
+    
+    # Zone Data
+    x = None
 
+    # Player Position Category
+    y = None
+    
+    best_score = 0
+    best_model = None
+    
+    #Hyperparameter Tuning
+    for k in range(max_k):
+        vec = DictVectorizer(sparse=False)
+        scaler = StandardScaler()
+        model = KNeighborsClassifier(n_neighbors=k)
+        pipeline = Pipeline([('vec', vec), 
+                            ('scaler', scaler),
+                            ('fit', model)])
+        
+        score = cross_val_score(pipeline, 
+                                x, 
+                                y,
+                                cv=5, scoring='accuracy').mean()
+
+        if score > best_score or best_model is None:
+            best_score = score
+            best_model = pipeline
+
+    print("Best Accuracy Score: " + str(best_score))
+    return best_model
+        
 # preprocess the dataframe
 def preprocess_data(drop_data):
     drop_data = drop_data.dropna()
