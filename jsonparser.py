@@ -152,8 +152,8 @@ def get_all_landings(telemetry):
 
 # Returns the first  and last locations someone jumped out of the plane
 def get_flight_data(telemetry):
-    first_coordinate = None # First player exit event from plane
-    current_coordinate = None # Last player exist even from plane
+    first_coordinate = None  # First player exit event from plane
+    current_coordinate = None  # Last player exist even from plane
     for log_entry in telemetry:
         if log_entry.get("_T") == "LogVehicleLeave" \
                 and log_entry.get("vehicle").get("vehicleId") == "DummyTransportAircraft_C":
@@ -407,7 +407,7 @@ def get_drop_data():
     match_files = []
     telemetry_files = []
 
-    downloader.setup_logging()
+    downloader.setup_logging(True)  # TODO: Add arguments to parser
     logging.info("Scanning for match and telemetry files in %s to parse", data_dir)
     for file in os.listdir(data_dir):
         if "_match" in file:
@@ -437,6 +437,7 @@ def split_drop_data_by_map(drop_data):
         map_data.append(drop_data[drop_data['map'] == map])
     return map_data
 
+
 # Split the drop data (assumed to already be split by map) by flight path
 def split_drop_data_by_flight_path(drop_data):
     flight_data = []
@@ -445,6 +446,7 @@ def split_drop_data_by_flight_path(drop_data):
         flight_data.append(drop_data[drop_data['flight_path'] == flight])
     print(len(flight_data))
     return flight_data
+
 
 def main():
     drop_data = get_drop_data()
@@ -458,15 +460,14 @@ def main():
     """
     max_k = 20              # training model hyperparam, anything above this doesn't tell us much
 
-
     print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
     rec.train_model(drop_data[0], max_k)
     print("PRINTING SAVAGE_MAIN RESULTS: ")
-    #rec.train_model(map_savage_data, max_k)
+    # rec.train_model(map_savage_data, max_k)
     print("PRINTING ERANGEL_MAIN RESULTS: ")
-    #rec.train_model(map_erangel_data, max_k)
+    # rec.train_model(map_erangel_data, max_k)
     print("PRINTING DESERT_MAIN RESULTS: ")
-    #rec.train_model(map_desert_data, max_k)
+    # rec.train_model(map_desert_data, max_k)
 
     print("###########DONE PRINTING DROP LOCATIONS PREDICTIONS###########\n\n")
 
