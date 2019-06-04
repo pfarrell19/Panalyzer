@@ -13,6 +13,7 @@ import multiprocessing
 import pickle
 from threading import Thread
 from pathlib import Path
+import argparse
 
 
 class APIKey:
@@ -30,9 +31,21 @@ class MatchSamplesResponse:
 
 
 def main():
+    # Add arg parsing for downloading in a loop and downloading to directory
+    parser = argparse.ArgumentParser("Downloads PUBG match data")
+    parser.add_argument('--loop', action='store_true')
+    parser.add_argument('--downloaddir')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--apikeys')
+    args = parser.parse_args()
     api_keys_filename = "api_keys.txt"
+    if args.apikeys is not None:
+        api_keys_filename = args.apikeys
+    download_directory = "data/"
+    if args.downloaddir is not None:
+        download_directory = args.downloaddir
     download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
-    setup_logging()
+    setup_logging(args.debug)
 
     # Get API keys
     logging.debug("Getting API keys from file %s", api_keys_filename)
@@ -41,42 +54,46 @@ def main():
         for key in api_keys_file:
             api_keys.append(APIKey(key.rstrip()))
 
-    # Get matches and test keys
-    logging.debug("Cycling through API keys to retrieve sample set of match ids")
-    sample_matches = None
-    match_id_queue = []
-    for key in api_keys:
-        if key.limit_reset < time.time():
-            key.limit_remaining = key.limit_max
-        if key.limit_remaining == 0:
-            logging.info("API key ending in %s has no uses remaining, skipping and trying next key in pool", key[-4::])
-            continue
-        sample_matches = get_sample_matches(key)
-        if sample_matches.response_code == 200:
-            match_id_queue.extend(sample_matches.match_ids)
-            logging.debug("Sample match ids acquired")
+    while True:
+        # Get matches and test keys
+        logging.debug("Cycling through API keys to retrieve sample set of match ids")
+        sample_matches = None
+        match_id_queue = []
+        for key in api_keys:
+            if key.limit_reset < time.time():
+                key.limit_remaining = key.limit_max
+            if key.limit_remaining == 0:
+                logging.info("API key ending in %s has no uses remaining, skipping and trying next key in pool", key[-4::])
+                continue
+            sample_matches = get_sample_matches(key)
+            if sample_matches.response_code == 200:
+                match_id_queue.extend(sample_matches.match_ids)
+                logging.debug("Sample match ids acquired")
+                break
+        if len(match_id_queue) < 1:
+            logging.error("Could not get any match ids with any keys in pool")
+
+        # Query each match on the API and dump its info
+        logging.debug("Retrieving info about each match")
+        if sample_matches is None:
+            logging.exception("No match ids found to download, quitting")
+            exit()
+        telemetry_queue = multiprocessing.Queue()
+        for i in range(download_threads):
+            new_thread = Thread(target=handle_telemetry, args=(telemetry_queue, download_directory))
+            new_thread.daemon = True
+            new_thread.start()
+        for count, current_match in enumerate(match_id_queue):
+            logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
+            match_object = get_match_stats(current_match)
+            telemetry_queue.put(match_object)
+        telemetry_queue.join()
+
+        if args.loop:
             break
-    if len(match_id_queue) < 1:
-        logging.error("Could not get any match ids with any keys in pool")
-
-    # Query each match on the API and dump its info
-    logging.debug("Retrieving info about each match")
-    if sample_matches is None:
-        logging.exception("No match ids found to download, quitting")
-        exit()
-    telemetry_queue = multiprocessing.Queue()
-    for i in range(download_threads):
-        new_thread = Thread(target=handle_telemetry, args=(telemetry_queue,))
-        new_thread.daemon = True
-        new_thread.start()
-    for count, current_match in enumerate(match_id_queue):
-        logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
-        match_object = get_match_stats(current_match)
-        telemetry_queue.put(match_object)
-    telemetry_queue.join()
 
 
-def handle_telemetry(telemetry_queue):
+def handle_telemetry(telemetry_queue, download_directory):
     logging.info("Downloader thread active")
     while True:
         match_object = telemetry_queue.get()
@@ -85,25 +102,28 @@ def handle_telemetry(telemetry_queue):
         map_name = match_object.map
 
         # Save telemetry if it's new
-        #match_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id + "_match.pickle"
-        match_file_name = "data/" + match_object.match_id + "_match.pickle"
+        # match_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id + "_match.pickle"
+        match_file_name = download_directory + match_object.match_id + "_match.pickle"
         match_data_file = Path(match_file_name)
         if match_data_file.is_file():
             logging.info("Match id %s already saved to disk, skipping file write", match_object.match_id)
         else:  # TODO: Downloads not appearing
             logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
-            # telemetry_file_name = "data/" + match_date + "/" + map_name + "/" + match_object.match_id\
+            # telemetry_file_name = download_directory + match_date + "/" + map_name + "/" + match_object.match_id\
             #                       + "_telemetry.pickle"
-            telemetry_file_name = "data/" + match_object.match_id + "_telemetry.pickle"
+            telemetry_file_name = download_directory + match_object.match_id + "_telemetry.pickle"
             write_pickle(match_file_name, match_object)
             write_pickle(telemetry_file_name, parsed_telemetry)
 
 
-def setup_logging():
+def setup_logging(show_debug):
     logging.debug("Setting up logging")
     root = logging.getLogger()
-    root.setLevel(logging.DEBUG)
+    if show_debug:
+        root.setLevel(logging.DEBUG)
+    else:
+        root.setLevel(logging.INFO)
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -112,7 +132,6 @@ def setup_logging():
 
 
 # Writes any object into a pickle file so it can be loaded later
-# TODO: Allow jsonparser to update these
 def write_pickle(file_path, object_to_pickle):
     if not os.path.exists(os.path.dirname(file_path)):
         try:
@@ -190,7 +209,7 @@ def get_match_stats(match_id):
     game_map = api_response_data_dataframe.loc['mapName', 'attributes']
     start_time = api_response_data_dataframe.loc['createdAt', 'attributes']
     duration = api_response_data_dataframe.loc['duration', 'attributes']
-    #patch_version = api_response_data_dataframe.loc['patchVersion', 'attributes']
+    # patch_version = api_response_data_dataframe.loc['patchVersion', 'attributes']
     match_data_object = match.match(match_id, game_mode, game_map, start_time, duration, telemetry_url)
     return match_data_object
 
