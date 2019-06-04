@@ -60,10 +60,11 @@ def main():
         sample_matches = None
         match_id_queue = []
         for key in api_keys:
-            if key.limit_reset < time.time():
+            if float(key.limit_reset) < time.time():
                 key.limit_remaining = key.limit_max
             if key.limit_remaining == 0:
-                logging.info("API key ending in %s has no uses remaining, skipping and trying next key in pool", key[-4::])
+                logging.info("API key ending in %s has no uses remaining, skipping and trying next key in pool",
+                             key[-4::])
                 continue
             sample_matches = get_sample_matches(key)
             if sample_matches.response_code == 200:
@@ -87,9 +88,8 @@ def main():
             logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
             match_object = get_match_stats(current_match)
             telemetry_queue.put(match_object)
-        telemetry_queue.join()
 
-        if args.loop:
+        if not args.loop:
             break
 
 
