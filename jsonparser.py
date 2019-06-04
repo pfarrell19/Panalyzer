@@ -295,7 +295,7 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
         logging.error("Could not get launch data")
 
 
-def build_drop_data(telemetry_files):  # TODO: Separate by map and patch version
+def build_drop_data(telemetry_files):
     data_dir = ".\\data\\"
     drop_data = []
 
