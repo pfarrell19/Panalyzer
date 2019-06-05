@@ -451,10 +451,10 @@ def get_drop_data(data_dir):
     all_data = []
     map_data_li = split_drop_data_by_map(drop_data)
     for map_df in map_data_li:
-        #if map_df['map'].iloc[0] != "Savage_Main":
-            flight_data_li = split_drop_data_by_flight_path(map_df)
+        if map_df.iloc[0]['map'] == "Savage_Main":
+            flight_data_li = [map_df]
         else:
-            flight_data_li = map_df
+            flight_data_li = split_drop_data_by_flight_path(map_df)
         all_data.extend(flight_data_li)
 
     return all_data
@@ -511,7 +511,7 @@ def main():
     max_k = 20  # training model hyperparam, anything above this doesn't tell us much
 
     # print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
-    rec.train_model(drop_data[0], max_k)
+    # rec.train_model(drop_data[0], max_k)
     # print("PRINTING SAVAGE_MAIN RESULTS: ")
     # rec.train_model(map_savage_data, max_k)
     # print("PRINTING ERANGEL_MAIN RESULTS: ")
