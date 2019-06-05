@@ -52,7 +52,7 @@ def get_player_paths(telemetry):
 
     rankings = jsonparser.get_rankings(telemetry)
     rankings_df = pd.DataFrame(rankings)
-    return positions_df.set_index("name").join(rankings_df.set_index("name"))
+    return positions_df.set_index("name").join(rankings_df.set_index("name")).dropna().reset_index()
 
 
 def join_player_and_zone(player_paths, zone_info):
@@ -63,8 +63,8 @@ def join_player_and_zone(player_paths, zone_info):
     :param zone_info: DataFrame containing information about the poison gas zone and safe zone throughout the game
     :return: DataFrame indexed on the game state (0.0, 0.1, 0.5, 1.0,...) with columns:
 
-            [name, x, y, x_, y_, rank, poisonGasWarningPosition_x, poisonGasWarningPosition_y, poisonGasWarningRadius,
-             safetyZonePosition_x, safetyZonePosition_y, safetyZoneRadius]
+            [gameState, name, x_, y_, ranking, poisonGasWarningPosition_x, poisonGasWarningPosition_y,
+             poisonGasWarningRadius, safetyZonePosition_x, safetyZonePosition_y, safetyZoneRadius]
 
             where x_ and y_ are the rounded values of the raw locations.
             Each row represents a single player's location at a given time.
@@ -73,29 +73,10 @@ def join_player_and_zone(player_paths, zone_info):
     player_paths = player_paths.dropna().reset_index()
     player_paths['x_'] = player_paths['x'].apply(round_raw)
     player_paths['y_'] = player_paths['y'].apply(round_raw)
-    return player_paths.set_index("game_state").join(zone_info.set_index("isGame"))
+    player_paths.drop(['x', 'y'], axis=1, inplace=True)
 
+    joined_df = (player_paths.set_index("game_state").join(zone_info.set_index("isGame"))
+                 .drop("index", axis=1).reset_index())
+    joined_df.columns = ["gameState" if col == "index" else col for col in joined_df.columns]
 
-if __name__ == "__main__":
-    data_dir = ".\\data\\"
-    match_files = []
-    telemetry_files = []
-
-    #downloader.setup_logging()
-    logging.info("Scanning for match and telemetry files in %s to parse", data_dir)
-    for file in os.listdir(data_dir):
-        if "_match" in file:
-            logging.debug("Match file %s found, adding as match", file)
-            match_files.append(file)
-        elif "_telemetry" in file:
-            logging.debug("Telemetry file %s found, adding as match", file)
-            telemetry_files.append(file)
-
-    telemetry = jsonparser.load_pickle(data_dir + telemetry_files[0])
-
-    paths = get_player_paths(telemetry).dropna().reset_index()
-    blue_zones = jsonparser.getZoneStates(telemetry)
-
-    all = join_player_and_zone(paths, blue_zones)
-    display_player_paths(all[(all.name == 'AmuseTown')], "Savage_Main")
-    print(all.columns, "\n", all.head())
+    return joined_df
