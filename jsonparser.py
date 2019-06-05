@@ -1,15 +1,21 @@
+import argparse
+import multiprocessing
 import pickle
 import os
+from threading import Thread
+
 import matplotlib.pyplot as plt
 from imageio import imread
-import math
 import numpy as np
 import pandas as pd
 import math
 import logging
 import downloader
 import recommender as rec
-import json
+import sklearn
+import sklearn.preprocessing
+from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, KFold
+from sklearn.neighbors import KNeighborsClassifier
 
 # TODO: remove global...
 CM_TO_KM = 100000           # CM in a KM
@@ -223,19 +229,90 @@ def get_loc_cat(x, y, map_dim):
     return chr(65 + int(x_)) + chr(65 + int(y_))
 
 
-def build_drop_data(telemetry_files):
-    data_dir = ".\\data\\"
-    drop_data = []
+# Plot the drop locations of each player (in blue), with opacity in relation to their rank in that match
+# (more opaque = lower rank), along with the location the first person left the plane (in green)
+# and the last person to leave the plane (in red)
+def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
+    landings = get_all_landings(telemetry)
+    rankings = get_rankings(telemetry)
+    map_name = get_map(telemetry)
 
-    # Plots each match landing locations on a new plot
-    for match_num in range(0, len(telemetry_files)):
-        logging.debug("Building match %i of %i", match_num, len(telemetry_files) - 1)
+    # Set up plot scale
+    if map_name == "Savage_Main":                        # 4km map
+        x_max = MAX_MAP_SIZE * (1/2)
+        y_max = x_max
+        map_img = imread("savage.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 4.0, 0.0, 4.0])
+    elif map_name == "Erangel_Main":                     # 8km map
+        x_max = MAX_MAP_SIZE
+        y_max = MAX_MAP_SIZE
+        map_img = imread("erangel.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
+    elif map_name == "Desert_Main":                     # 8km map
+        x_max = MAX_MAP_SIZE
+        y_max = x_max
+        map_img = imread("miramar.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
+    elif map_name == "DihorOtok_Main":                   # 6km map
+        x_max = MAX_MAP_SIZE * (3/4)
+        y_max = x_max
+        map_img = imread("vikendi.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 6.0, 0.0, 6.0])
+
+    first_launch, last_launch = get_flight_data(telemetry)
+
+    if first_launch is not None:
+        launch_x = [first_launch['x'], last_launch['x']]
+        launch_y = [first_launch['y'], last_launch['y']]
+
+        ax = fig.add_subplot(fig_x, fig_y, fig_num)
+
+        # plot first and last jump locations
+        ax.scatter(launch_x[0] / CM_TO_KM, launch_y[0] / CM_TO_KM, s=100,
+                   color='green', edgecolors='black', zorder=1)
+        ax.scatter(launch_x[1] / CM_TO_KM, launch_y[1] / CM_TO_KM, s=100,
+                   color='red', edgecolors='black', zorder=1)
+
+        # plot line between them
+        ax.plot([x_ / CM_TO_KM for x_ in launch_x],
+                [y_ / CM_TO_KM for y_ in launch_y], 'grey', linestyle='--', marker='', zorder=1)
+
+        # plot each player according to their ranking
+        for ranking in rankings:
+            landing_loc = landings[ranking['name']]
+            # print("Player {} landing at position\t ({}, {}) and ended up rank : {}".format(ranking['name'],
+            #                                                                           landing_loc[0],
+            #                                                                          landing_loc[1],
+            #                                                                          ranking['ranking']))
+            if ranking['ranking'] == 1:
+                ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM,
+                           color='yellow', edgecolors='black', zorder=1)
+            else:
+                ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM,
+                           color='blue', alpha=1/ranking['ranking'], zorder=1)
+        plt.ylim(0, y_max)
+        plt.xlim(0, x_max)
+        plt.xlabel('km')
+        plt.ylabel('km')
+        plt.title(map_name)
+        plt.savefig('./match_landings/match_{}.png'.format(match_num))
+        plt.show()
+    else:
+        logging.error("Could not get launch data")
+
+
+def drop_data_worker(filename_queue, drop_data):
+    logging.info("Parser thread active")
+
+    while not filename_queue.empty():
+        file_path = filename_queue.get()
         # If the filesize is greater than 0, ie there is actual data in it
-        if os.path.getsize(data_dir + telemetry_files[match_num]) > 0:
+        if os.path.getsize(file_path) > 0:
             try:
-                telemetry = load_pickle(data_dir + telemetry_files[match_num])
+                telemetry = load_pickle(file_path)
+                logging.debug("Loaded match file %s, approximately %i remaining in queue", file_path, filename_queue.qsize())
             except EOFError:
-                logging.error("Match file terminated unexpectedly, skipping")
+                logging.error("Match file %s terminated unexpectedly, skipping", file_path)
                 continue  # Skip processing files that terminate early
             first, last = get_flight_data(telemetry)
             map_name = get_map(telemetry)
@@ -249,11 +326,13 @@ def build_drop_data(telemetry_files):
                 map_size = 800000
             elif map_name == "DihorOtok_Main":  # 6km map
                 map_size = 600000
+            else:
+                continue
 
             # Get the flight direction
             if first is not None:
                 flight_vec = get_flight_vector(first, last)
-                dir = get_flight_category(flight_vec)
+                direction = get_flight_category(flight_vec)
 
             # Get the landings
             landing_locs = get_all_landings(telemetry)
@@ -270,10 +349,30 @@ def build_drop_data(telemetry_files):
                                   'drop_loc_raw': loc,
                                   'drop_loc_cat': loc_category,
                                   'rank': player_rank,
-                                  'flight_path': dir,
+                                  'flight_path': direction,
                                   'map': map_name})
-                #print("{} ==> {}".format(flight_vec, dir))
-            #display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
+                # print("{} ==> {}".format(flight_vec, dir))
+            # display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
+
+
+def build_drop_data(telemetry_files, data_dir):
+    drop_data = []
+    threads = []
+    filename_queue = multiprocessing.Queue()
+    download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
+
+    for match_num in range(0, len(telemetry_files)):
+        filename_queue.put(data_dir + telemetry_files[match_num])
+
+    for i in range(download_threads):
+        new_thread = Thread(target=drop_data_worker, args=(filename_queue, drop_data))
+        new_thread.daemon = True
+        new_thread.start()
+        logging.debug("Starting thread %i", i)
+        threads.append(new_thread)
+
+    for i in range(download_threads):
+        threads[i].join()
 
     return pd.DataFrame(drop_data)
 
@@ -332,12 +431,10 @@ def getItemPickup(json_object):
 
 
 # Returns a list of DataFrames where each DataFrame contains all of the drop data for a given map and flight path
-def get_drop_data():
-    data_dir = ".\\data\\"
+def get_drop_data(data_dir):
     match_files = []
     telemetry_files = []
 
-    downloader.setup_logging(True)  # TODO: Add arguments to this parser
     logging.info("Scanning for match and telemetry files in %s to parse", data_dir)
     for file in os.listdir(data_dir):
         if "_match" in file:
@@ -348,7 +445,7 @@ def get_drop_data():
             telemetry_files.append(file)
 
     # Get aggregate data
-    drop_data = build_drop_data(telemetry_files)
+    drop_data = build_drop_data(telemetry_files, data_dir)
 
     # Split by map and flight path
     all_data = []
@@ -379,6 +476,19 @@ def split_drop_data_by_flight_path(drop_data):
         flight_data.append(drop_data[drop_data['flight_path'] == flight])
     print(len(flight_data))
     return flight_data
+
+
+def success_category(x):
+    return x // 20
+
+
+def preprocess_data(df):
+    labelencoder_x = sklearn.preprocessing.LabelEncoder()
+    x = df.iloc[:, :].values
+    df['flight_path'] = labelencoder_x.fit_transform(x[:, 1])
+    df['map'] = labelencoder_x.fit_transform(x[:, 0])
+    df['success_category'] = labelencoder_x.fit_transform(x[:, -1])
+    return df
 
 
 def main():
