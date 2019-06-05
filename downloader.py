@@ -45,9 +45,10 @@ def main():
     if args.downloaddir is not None:
         download_directory = args.downloaddir
     download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
-    if args.threads is not None:
-        download_threads = args.threads
+    with int(args.threads):
+        download_threads = int(args.threads)
     setup_logging(args.debug)
+    logging.debug("Using %i threads to download PUBG data", download_threads)
 
     # Get API keys
     logging.debug("Getting API keys from file %s", api_keys_filename)
@@ -96,7 +97,7 @@ def main():
 
 
 def handle_telemetry(telemetry_queue, download_directory):
-    logging.info("Downloader thread active")
+    logging.debug("Downloader thread active")
     while True:
         match_object = telemetry_queue.get()
         # patch_version = match_object.patch_version
@@ -108,9 +109,9 @@ def handle_telemetry(telemetry_queue, download_directory):
         match_file_name = download_directory + match_object.match_id + "_match.pickle"
         match_data_file = Path(match_file_name)
         if match_data_file.is_file():
-            logging.info("Match id %s already saved to disk, skipping file write", match_object.match_id)
-        else:  # TODO: Downloads not appearing
-            logging.debug("Worker process getting match telemetry for match id %s", match_object.match_id)
+            logging.info("Match id %s already saved to disk, skipping download", match_object.match_id)
+        else:
+            logging.debug("Worker process getting telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
             # telemetry_file_name = download_directory + match_date + "/" + map_name + "/" + match_object.match_id\
             #                       + "_telemetry.pickle"
@@ -120,7 +121,6 @@ def handle_telemetry(telemetry_queue, download_directory):
 
 
 def setup_logging(show_debug):
-    logging.debug("Setting up logging")
     root = logging.getLogger()
     if show_debug:
         root.setLevel(logging.DEBUG)
@@ -139,7 +139,7 @@ def write_pickle(file_path, object_to_pickle):
         try:
             os.makedirs(os.path.dirname(file_path))
         except OSError:
-            logging.error("Could not create directory for pickle at path %s", file_path)
+            logging.error("Could not create directory to store pickle at path %s", file_path)
     with open(file_path, 'wb') as output_file:  # Write to file, truncating (not appending), in binary output mode
         logging.debug("Writing object into file %s", file_path)
         pickle.dump(object_to_pickle, output_file, pickle.HIGHEST_PROTOCOL)
@@ -161,7 +161,7 @@ def get_sample_matches(api_key):
     sample_matches = MatchSamplesResponse(api_result.status_code)
 
     if api_result.status_code == 200:
-        logging.info("Received sample matches (HTTP status code 200), extracting match ids")
+        logging.debug("Received sample matches (HTTP status code 200), extracting match ids")
         # Dump json data into pandas for better formatting
         samples_df = pd.DataFrame(api_result.json())
 
@@ -170,7 +170,7 @@ def get_sample_matches(api_key):
         match_ids_dataframe = samples_norm['matches.data'].apply(pd.Series).T[0].apply(pd.Series)
         sample_matches.match_ids = match_ids_dataframe['id'].values
     else:
-        logging.info("HTTP status code %s encountered while retrieving matches", api_result.status_code)
+        logging.error("HTTP status code %s encountered while retrieving matches", api_result.status_code)
 
     return sample_matches
 
