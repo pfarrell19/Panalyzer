@@ -31,12 +31,12 @@ class MatchSamplesResponse:
 
 
 def main():
-    # Add arg parsing for downloading in a loop and downloading to directory
     parser = argparse.ArgumentParser("Downloads PUBG match data")
     parser.add_argument('--loop', action='store_true')
     parser.add_argument('--downloaddir')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--apikeys')
+    parser.add_argument('--threads')
     args = parser.parse_args()
     api_keys_filename = "api_keys.txt"
     if args.apikeys is not None:
@@ -45,6 +45,8 @@ def main():
     if args.downloaddir is not None:
         download_directory = args.downloaddir
     download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
+    if args.threads is not None:
+        download_threads = args.threads
     setup_logging(args.debug)
 
     # Get API keys
