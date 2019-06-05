@@ -451,7 +451,7 @@ def get_drop_data(data_dir):
     all_data = []
     map_data_li = split_drop_data_by_map(drop_data)
     for map_df in map_data_li:
-        if map_df['map'] != "Savage_Main":
+        #if map_df['map'].iloc[0] != "Savage_Main":
             flight_data_li = split_drop_data_by_flight_path(map_df)
         else:
             flight_data_li = map_df
@@ -492,27 +492,65 @@ def preprocess_data(df):
 
 
 def main():
-    drop_data = get_drop_data()
+    parser = argparse.ArgumentParser("Parses PUBG match data")
+    parser.add_argument('--downloaddir')
+    parser.add_argument('--debug', action='store_true')
+    args = parser.parse_args()
+    download_directory = "data/"
+    if args.downloaddir is not None:
+        download_directory = args.downloaddir
+    downloader.setup_logging(args.debug)
 
-    for df in drop_data:
-        print("\n", df.iloc[0][['map', 'flight_path']], " - ", df.shape[0], )
-    """
-    map_savage_data = rec.preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
-    map_erangel_data = rec.preprocess_data(drop_data[drop_data["map"] == "Erangel_Main"])
-    map_desert_data = rec.preprocess_data(drop_data[drop_data['map'] == 'Desert_Main'])
-    """
+    drop_data = get_drop_data(download_directory)
+    logging.info("Drop data loaded")
+    # for df in drop_data:
+    #     print("\n", df.iloc[0][['map', 'flight_path']], " - ", df.shape[0], )
+    # map_savage_data = rec.preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
+    # map_erangel_data = rec.preprocess_data(drop_data[drop_data["map"] == "Erangel_Main"])
+    # map_desert_data = rec.preprocess_data(drop_data[drop_data['map'] == 'Desert_Main'])
     max_k = 20  # training model hyperparam, anything above this doesn't tell us much
 
-    print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
+    # print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
     rec.train_model(drop_data[0], max_k)
-    print("PRINTING SAVAGE_MAIN RESULTS: ")
+    # print("PRINTING SAVAGE_MAIN RESULTS: ")
     # rec.train_model(map_savage_data, max_k)
-    print("PRINTING ERANGEL_MAIN RESULTS: ")
+    # print("PRINTING ERANGEL_MAIN RESULTS: ")
     # rec.train_model(map_erangel_data, max_k)
-    print("PRINTING DESERT_MAIN RESULTS: ")
+    # print("PRINTING DESERT_MAIN RESULTS: ")
     # rec.train_model(map_desert_data, max_k)
+    # print("###########DONE PRINTING DROP LOCATIONS PREDICTIONS###########\n\n")
 
-    print("###########DONE PRINTING DROP LOCATIONS PREDICTIONS###########\n\n")
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df[df["rank"] <= 10]
+        print(df)
+        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
+        df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
+        drop_data[i] = df
+
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df.drop(columns=['drop_loc_raw'])
+
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df['success_category'] = df['rank'].apply(success_category)
+        drop_data[i] = df
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
+        drop_data[i] = df
+    temp = preprocess_data(drop_data[0])
+    rec.train_model(temp, 20)
+    for df in drop_data:
+        rec.train_model(preprocess_data(df), 20)
+    drop_data = drop_data.dropna()
+    rec.train_model(drop_data, 20)
+    a = np.array(['a', 'b', 'f', 'd'])
+    b = np.array(['f', 'b', 'e', 'd'])
+    c = pd.DataFrame(np.array([[1, 2, 3],
+                               [4, 5, 6],
+                               [7, 8, 2]]), columns=['a', 'b', 'c'])
 
 
 if __name__ == "__main__":
