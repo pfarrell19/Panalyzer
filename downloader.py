@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--downloaddir')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--apikeys')
-    parser.add_argument('--threads')
+    parser.add_argument('--threads', type=int)
     args = parser.parse_args()
     api_keys_filename = "api_keys.txt"
     if args.apikeys is not None:
@@ -45,7 +45,7 @@ def main():
     if args.downloaddir is not None:
         download_directory = args.downloaddir
     download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
-    with int(args.threads):
+    if args.threads is not None:
         download_threads = int(args.threads)
     setup_logging(args.debug)
     logging.debug("Using %i threads to download PUBG data", download_threads)
@@ -83,20 +83,22 @@ def main():
             logging.exception("No match ids found to download, quitting")
             exit()
         telemetry_queue = multiprocessing.Queue()
+        download_count = 0
         for i in range(download_threads):
-            new_thread = Thread(target=handle_telemetry, args=(telemetry_queue, download_directory))
+            new_thread = Thread(target=handle_telemetry, args=(telemetry_queue, download_directory, download_count))
             new_thread.daemon = True
             new_thread.start()
         for count, current_match in enumerate(match_id_queue):
             logging.debug("Retrieving stats for match %i of %i", count, len(match_id_queue))
             match_object = get_match_stats(current_match)
             telemetry_queue.put(match_object)
-
-        if not args.loop:
+        logging.info("Downloaded %i new matches from given sample list", download_count)
+        if (not args.loop) or download_count < 1:
+            logging.info("Downloader finished")
             break
 
 
-def handle_telemetry(telemetry_queue, download_directory):
+def handle_telemetry(telemetry_queue, download_directory, download_count):
     logging.debug("Downloader thread active")
     while True:
         match_object = telemetry_queue.get()
@@ -113,6 +115,7 @@ def handle_telemetry(telemetry_queue, download_directory):
         else:
             logging.debug("Worker process getting telemetry for match id %s", match_object.match_id)
             parsed_telemetry = get_telemetry(match_object.telemetry_url)
+            download_count += 1
             # telemetry_file_name = download_directory + match_date + "/" + map_name + "/" + match_object.match_id\
             #                       + "_telemetry.pickle"
             telemetry_file_name = download_directory + match_object.match_id + "_telemetry.pickle"
