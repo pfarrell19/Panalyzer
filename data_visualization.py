@@ -101,9 +101,9 @@ def display_drop_locations_by_prediction(player_data):
         plt.imshow(map_img, zorder=0, extent=[0.0, 6.0, 0.0, 6.0])
 
 
+def display_player_path(paths_df, blue_zones, map_name):
+    #TODO Blue zone display
 
-def display_player_paths(paths_df, map_name):
-    # Set up plot scale
     if map_name == "Savage_Main":  # 4km map
         x_max = jsp.MAX_MAP_SIZE * (1 / 2)
         y_max = x_max
@@ -127,7 +127,15 @@ def display_player_paths(paths_df, map_name):
 
     paths_after_drop = paths_df[paths_df.index >= 0.5]
 
-    plt.plot(paths_after_drop['x_'] / jsp.CM_TO_KM, paths_after_drop['y_'] / jsp.CM_TO_KM)
+    drop_x = paths_after_drop.iat[0, paths_after_drop.columns.get_loc("x")]
+    drop_y = paths_after_drop.iat[0, paths_after_drop.columns.get_loc("y")]
+    end_x = paths_after_drop.iat[paths_after_drop.index[-1]-1, paths_after_drop.columns.get_loc("x")]
+    end_y = paths_after_drop.iat[paths_after_drop.index[-1]-1, paths_after_drop.columns.get_loc("y")]
+
+    plt.plot(paths_after_drop['x'] / jsp.CM_TO_KM, paths_after_drop['y'] / jsp.CM_TO_KM)
+    plt.plot(drop_x / jsp.CM_TO_KM, drop_y / jsp.CM_TO_KM, 'o', color="green", zorder=1)
+    plt.plot(end_x / jsp.CM_TO_KM, end_y / jsp.CM_TO_KM, 'x', color="red", zorder=1)
+
     plt.ylim(0, y_max)
     plt.xlim(0, x_max)
     plt.xlabel('km')
@@ -136,4 +144,5 @@ def display_player_paths(paths_df, map_name):
     plt.grid(b=True, which='major', c='grey', alpha=0.5, linestyle='-')
     plt.grid(b=True, which='minor', c='grey', alpha=0.5, linestyle='-')
     plt.title(map_name)
+
     plt.show()

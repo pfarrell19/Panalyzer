@@ -1,21 +1,6 @@
 import jsonparser
-import downloader
-from data_visualization import display_player_paths
-import logging
-import os
-from math import sqrt, pi, cos, sin
-from random import random
 import pandas as pd
-import numpy as np
 from pandas.io.json import json_normalize
-
-
-def in_zone(x, y, zone_x, zone_y, zone_r):
-    """ Given (x, y) of a position, return True if it is within the zone boundaries
-        and False if it is not
-    """
-    dist_to_center = np.linalg.norm(np.array(x, y) - np.array(zone_x, zone_y))
-    return dist_to_center < zone_r
 
 
 def round_raw(raw):
@@ -26,7 +11,7 @@ def round_raw(raw):
     :param raw: raw value of coordinate (in cm)
     :return: rounded value to the nearest .05km
     """
-    return (raw // 10000) * 10000 + 5000
+    return int((raw // 10000) * 10000 + 5000)
 
 
 def get_player_paths(telemetry):
