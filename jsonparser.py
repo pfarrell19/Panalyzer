@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 import math
 import logging
+
+from sklearn.externals import joblib
+
 import downloader
 import recommender as rec
 import sklearn
@@ -467,7 +470,27 @@ def get_drop_data(data_dir):
 
     return all_data
 
+def get_drop_data_by_map(drop_data):
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df[df["rank"] <= 10]
+        print(df)
+        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
+        df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
+        drop_data[i] = df
 
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df.drop(columns=['drop_loc_raw'])
+
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df['success_category'] = df['rank'].apply(success_category)
+        drop_data[i] = df
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
+        drop_data[i] = df
 # Split the DataFrame containing all of the drop data into separate DataFrames for each map
 def split_drop_data_by_map(drop_data):
     map_data = []
@@ -511,48 +534,36 @@ def main():
 
     drop_data = get_drop_data(download_directory)
     logging.info("Drop data loaded")
+
+
+    # for i in range(len(drop_data)):
+    #     df = drop_data[i]
+    #     df = df[df["rank"] <= 10]
+    #     print(df)
+    #     df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
+    #     df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
+    #     drop_data[i] = df
+    #
+    # for i in range(len(drop_data)):
+    #     df = drop_data[i]
+    #     df = df.drop(columns=['drop_loc_raw'])
+    #
+    # for i in range(len(drop_data)):
+    #     df = drop_data[i]
+    #     df['success_category'] = df['rank'].apply(success_category)
+    #     drop_data[i] = df
+    # for i in range(len(drop_data)):
+    #     df = drop_data[i]
+    #     df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
+    #     drop_data[i] = df
+
+
+
+            # temp = preprocess_data(drop_data[0])
     # for df in drop_data:
-    #     print("\n", df.iloc[0][['map', 'flight_path']], " - ", df.shape[0], )
-    # map_savage_data = rec.preprocess_data(drop_data[drop_data['map'] == "Savage_Main"])
-    # map_erangel_data = rec.preprocess_data(drop_data[drop_data["map"] == "Erangel_Main"])
-    # map_desert_data = rec.preprocess_data(drop_data[drop_data['map'] == 'Desert_Main'])
-    max_k = 20  # training model hyperparam, anything above this doesn't tell us much
-
-    # print("######PRINTING RESULTS FOR DROP LOCATION PREDICTIONS##########\n\n")
-    # rec.train_model(drop_data[0], max_k)
-    # print("PRINTING SAVAGE_MAIN RESULTS: ")
-    # rec.train_model(map_savage_data, max_k)
-    # print("PRINTING ERANGEL_MAIN RESULTS: ")
-    # rec.train_model(map_erangel_data, max_k)
-    # print("PRINTING DESERT_MAIN RESULTS: ")
-    # rec.train_model(map_desert_data, max_k)
-    # print("###########DONE PRINTING DROP LOCATIONS PREDICTIONS###########\n\n")
-
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df = df[df["rank"] <= 10]
-        print(df)
-        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
-        df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
-        drop_data[i] = df
-
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df = df.drop(columns=['drop_loc_raw'])
-
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df['success_category'] = df['rank'].apply(success_category)
-        drop_data[i] = df
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
-        drop_data[i] = df
-    temp = preprocess_data(drop_data[0])
-    for df in drop_data:
-        print(df)
-        rec.train_model(preprocess_data(df), 6)
-        print("success!!!!")
+    #     print(df)
+    #     rec.train_model(preprocess_data(df), 6)
+    #     print("success!!!!")
     #rec.train_model(drop_data, 7)
     a = np.array(['a', 'b', 'f', 'd'])
     b = np.array(['f', 'b', 'e', 'd'])
