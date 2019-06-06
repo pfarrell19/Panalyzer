@@ -26,7 +26,7 @@ def main():
 
 
     if '-l' not in argv:
-        print 'error: need map name'
+        print ('error: need map name')
         exit()
 
     map_name = argv[argv.index('-l') + 1]
@@ -44,7 +44,7 @@ def main():
         dropInput = pickle.load(dropInputFile)
         modelDrop = pickle.load('''model''')
         dropPrediction = predict(modelDrop, dropInput)
-        print "Suggested Drop Location: {!r}".format(dropPrediction)
+        print ("Suggested Drop Location: {!r}".format(dropPrediction))
 
 
     if path:
@@ -52,7 +52,7 @@ def main():
         pathInput = pickle.load(pathInputFile)
         modelPath = pickle.load('''model''')
         pathPrediction = predict(modelPath, pathInput)
-        print "Suggested Path: {!r}".format(pathPrediction)
+        print ("Suggested Path: {!r}".format(pathPrediction))
 
     return 0
 

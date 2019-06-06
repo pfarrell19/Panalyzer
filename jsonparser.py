@@ -318,7 +318,7 @@ def drop_data_worker(filename_queue, drop_data):
         if os.path.getsize(file_path) > 0:
             try:
                 telemetry = load_pickle(file_path)
-                logging.debug("Loaded match file %s, approximately %i remaining in queue", file_path, filename_queue.qsize())
+                #logging.debug("Loaded match file %s, approximately %i remaining in queue", file_path, filename_queue.qsize())
             except EOFError:
                 logging.error("Match file %s terminated unexpectedly, skipping", file_path)
                 continue  # Skip processing files that terminate early
@@ -549,11 +549,11 @@ def main():
         df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
         drop_data[i] = df
     temp = preprocess_data(drop_data[0])
-    rec.train_model(temp, 20)
     for df in drop_data:
-        rec.train_model(preprocess_data(df), 20)
-    drop_data = drop_data.dropna()
-    rec.train_model(drop_data, 20)
+        print(df)
+        rec.train_model(preprocess_data(df), 6)
+        print("success!!!!")
+    #rec.train_model(drop_data, 7)
     a = np.array(['a', 'b', 'f', 'd'])
     b = np.array(['f', 'b', 'e', 'd'])
     c = pd.DataFrame(np.array([[1, 2, 3],

@@ -1,6 +1,6 @@
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, KFold
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder, StandardScaler, OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction import DictVectorizer
 
@@ -56,40 +56,27 @@ def gen_path(drop_x, drop_y):
 def train_model(df, max_k):
     x = df.iloc[:, :-1].copy()  # assuming our target is at the very end of the dataframe
     y = df.iloc[:, -1].copy()
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2)
-    x_train = scale(x_train)
-    x_test = scale(x_test)
-    k_scores = []
+    # x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2)
+    best_score = 0.0
+    best_model = None
+    k = max(len(df), max_k)
     for k in range(1, max_k):
-        knn = KNeighborsClassifier(n_neighbors=k)
-        cv_scores = cross_val_score(knn, x_train, y_train, cv=10, scoring='accuracy')
-        k_scores.append(cv_scores.mean())
+        try:
+            scaler = StandardScaler()
+            model = KNeighborsClassifier(n_neighbors=k)
+            pipeline = Pipeline([('scaler', scaler),
+                                 ('fit', model)])
+            score = cross_val_score(pipeline, x, y).mean()
 
-    max_score = max(k_scores)
 
-    #  get the arg max of the score array to determine the optimal value for k
-    k_opt = None
-    for i in range(len(k_scores)):
-        if k_scores[i] == max_score:
-            k_opt = i + 1
 
-    knn = KNeighborsClassifier(n_neighbors=k_opt)
-    kf = KFold(n_splits=10)
-
-    # split the training data into different validation folds and run a training loop on it
-
-    kf.get_n_splits(x_train)
-    training_scores = []
-
-    knn.fit(x_train, y_train)  # we get about -2.something places per map accuracy
-    # testing_accuracy = (knn.predict(x_test) - y_test).mean()
-
-    predictions = knn.predict(x_test)
-    correct_predictions = predictions[predictions == y_test]
-
-    print("TESTING ACCURACY: ", len(correct_predictions) / len(predictions))
-    return knn
-
+            if score > best_score or best_model is None:
+                best_score = score
+                best_model = pipeline
+        except Exception:
+            print("Best Accuracy Score: " + str(best_score))
+            return best_model
+    return best_model
 
 def player_path_model(df, max_k):
     # TODO: get x and y from df
