@@ -18,12 +18,12 @@ from sklearn.model_selection import train_test_split, cross_val_score, cross_val
 from sklearn.neighbors import KNeighborsClassifier
 
 # TODO: remove global...
-CM_TO_KM = 100000           # CM in a KM
-MAX_MAP_SIZE = 8            # In KM
+CM_TO_KM = 100000  # CM in a KM
+MAX_MAP_SIZE = 8  # In KM
 
 
 # search for specific attributes
-# player_id :   players acount id (eg. 'acount.*****')
+# player_id :   players account id (eg. 'account.*****')
 # start_range : starting time (eg. 'YYYY-MM-DDTHH:MM:SS.SSSZ')
 # end_range:    ending time
 # event_type:   list of type of event (eg. ['LogParachutepiLanding'])
@@ -34,7 +34,6 @@ def search(json_object, player_id=None, start_range=None, end_range=None, event_
         if (is_event(entry, event_type) and
                 in_range(entry['_D'], start_range, end_range) and
                 has_player(entry, player_id)):
-
             events.append(entry)
     return events
 
@@ -180,7 +179,7 @@ def get_flight_vector(first_drop, last_drop):
 # Returns the angle between the two flight vectors u and v (squared)
 # Note: u and v must be unit vectors already
 def flight_diff(u, v):
-    return np.arccos(np.clip(np.dot(u, v), -1, 1))**2
+    return np.arccos(np.clip(np.dot(u, v), -1, 1)) ** 2
 
 
 # Given a flight path (unit vectorized), get the direction that it is closest to
@@ -223,6 +222,7 @@ def get_flight_cat_from_telemetry(telemetry):
     else:
         return None
 
+
 # Convert raw (x, y) coordinates to the category
 # Maps are divided into a 20x20 grid of square_size x square_size blocks
 # where each square can be represented by a letter for the x and y position of that
@@ -246,23 +246,23 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
     map_name = get_map(telemetry)
 
     # Set up plot scale
-    if map_name == "Savage_Main":                        # 4km map
-        x_max = MAX_MAP_SIZE * (1/2)
+    if map_name == "Savage_Main":  # 4km map
+        x_max = MAX_MAP_SIZE * (1 / 2)
         y_max = x_max
         map_img = imread("savage.png")
         plt.imshow(map_img, zorder=0, extent=[0.0, 4.0, 0.0, 4.0])
-    elif map_name == "Erangel_Main":                     # 8km map
+    elif map_name == "Erangel_Main":  # 8km map
         x_max = MAX_MAP_SIZE
         y_max = MAX_MAP_SIZE
         map_img = imread("erangel.png")
         plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
-    elif map_name == "Desert_Main":                     # 8km map
+    elif map_name == "Desert_Main":  # 8km map
         x_max = MAX_MAP_SIZE
         y_max = x_max
         map_img = imread("miramar.png")
         plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
-    elif map_name == "DihorOtok_Main":                   # 6km map
-        x_max = MAX_MAP_SIZE * (3/4)
+    elif map_name == "DihorOtok_Main":  # 6km map
+        x_max = MAX_MAP_SIZE * (3 / 4)
         y_max = x_max
         map_img = imread("vikendi.png")
         plt.imshow(map_img, zorder=0, extent=[0.0, 6.0, 0.0, 6.0])
@@ -297,7 +297,7 @@ def display_drop_locations(telemetry, fig, fig_x, fig_y, fig_num, match_num):
                            color='yellow', edgecolors='black', zorder=1)
             else:
                 ax.scatter(landing_loc[0] / CM_TO_KM, landing_loc[1] / CM_TO_KM,
-                           color='blue', alpha=1/ranking['ranking'], zorder=1)
+                           color='blue', alpha=1 / ranking['ranking'], zorder=1)
         plt.ylim(0, y_max)
         plt.xlim(0, x_max)
         plt.xlabel('km')
@@ -318,7 +318,8 @@ def drop_data_worker(filename_queue, drop_data):
         if os.path.getsize(file_path) > 0:
             try:
                 telemetry = load_pickle(file_path)
-                logging.debug("Loaded match file %s, approximately %i remaining in queue", file_path, filename_queue.qsize())
+                logging.debug("Loaded match file %s, approximately %i remaining in queue", file_path,
+                              filename_queue.qsize())
             except EOFError:
                 logging.error("Match file %s terminated unexpectedly, skipping", file_path)
                 continue  # Skip processing files that terminate early
@@ -363,11 +364,10 @@ def drop_data_worker(filename_queue, drop_data):
             # display_drop_locations(telemetry, plt.figure(), 1, 1, 1, match_num)
 
 
-def build_drop_data(telemetry_files, data_dir):
+def build_drop_data(telemetry_files, data_dir, download_threads):
     drop_data = []
     threads = []
     filename_queue = multiprocessing.Queue()
-    download_threads = os.cpu_count()  # Create threads equivalent to number of CPU cores
 
     for match_num in range(0, len(telemetry_files)):
         filename_queue.put(data_dir + telemetry_files[match_num])
@@ -388,58 +388,58 @@ def build_drop_data(telemetry_files, data_dir):
 # Get safe zone and poison zone states (location and radius) throughout the game
 # Returns dataframe for each time & states
 # columns: ['_D', 'safetyZonePosition_x', 'safetyZonePosition_y', 'safetyZoneRadius', ...]
-def getZoneStates(json_object):
-    logGameStates = search(json_object, None, None, None, ['LogGameStatePeriodic'])
-    allStates = []
+def get_zone_states(json_object):
+    logged_game_states = search(json_object, None, None, None, ['LogGameStatePeriodic'])
+    all_states = []
     iterated_states = []
-    for gameState in logGameStates:
+    for gameState in logged_game_states:
         timestamp = gameState['common']['isGame']
         if timestamp not in iterated_states:
             state = gameState['gameState']
-            newStateObj = {k : state[k] for k in ('safetyZoneRadius',
-                                                  'poisonGasWarningRadius')}
-            safePos = state['safetyZonePosition']
-            poisPos = state['poisonGasWarningPosition']
+            new_state_object = {k: state[k] for k in ('safetyZoneRadius',
+                                                      'poisonGasWarningRadius')}
+            safe_position = state['safetyZonePosition']
+            poison_position = state['poisonGasWarningPosition']
 
-            newStateObj['safetyZonePosition_x'] = safePos['x']
-            newStateObj['safetyZonePosition_y'] = safePos['y']
-            newStateObj['isGame'] = timestamp
-            newStateObj['poisonGasWarningPosition_x'] = poisPos['x']
-            newStateObj['poisonGasWarningPosition_y'] = poisPos['y']
-            allStates.append(newStateObj)
+            new_state_object['safetyZonePosition_x'] = safe_position['x']
+            new_state_object['safetyZonePosition_y'] = safe_position['y']
+            new_state_object['isGame'] = timestamp
+            new_state_object['poisonGasWarningPosition_x'] = poison_position['x']
+            new_state_object['poisonGasWarningPosition_y'] = poison_position['y']
+            all_states.append(new_state_object)
             iterated_states.append(timestamp)
-    df = pd.DataFrame(allStates)
+    df = pd.DataFrame(all_states)
     return df
 
 
 # Get items picked up (house, crate, loot, etc) and by whom
 # Returns dataframe for each pickup log
 # columns: ['character_accountId', 'character_name', 'item_category', ...]
-def getItemPickup(json_object):
-    itemPicks = search(json_object, 
-                        None, 
-                        None, 
-                        None,   
-                        ['LogItemPickup', 
-                                'LogItemPickupFromCarepackage', 
-                                'LogItemPickupFromLootBox'])
+def get_item_pickup(json_object):
+    item_pickups = search(json_object,
+                          None,
+                          None,
+                          None,
+                          ['LogItemPickup',
+                           'LogItemPickupFromCarepackage',
+                           'LogItemPickupFromLootBox'])
     parsed_data = []
-    for log in itemPicks:
+    for log in item_pickups:
         char = log['character']
         item = log['item']
-        pickupState = {
-                    '_D' : log['_D'],
-                    'character_accountId' : char['accountId'],
-                    'character_name' : char['name'],
-                    'item_category' : item['category'], 
-                    'item_subCategory' : item['subCategory'],
-                    'item_Id' : item['itemId']}
-        parsed_data.append(pickupState)
+        pickup_state = {
+            '_D': log['_D'],
+            'character_accountId': char['accountId'],
+            'character_name': char['name'],
+            'item_category': item['category'],
+            'item_subCategory': item['subCategory'],
+            'item_Id': item['itemId']}
+        parsed_data.append(pickup_state)
     return pd.DataFrame(parsed_data)
 
 
 # Returns a list of DataFrames where each DataFrame contains all of the drop data for a given map and flight path
-def get_drop_data(data_dir):
+def get_drop_data(data_dir, threads):
     match_files = []
     telemetry_files = []
 
@@ -453,7 +453,7 @@ def get_drop_data(data_dir):
             telemetry_files.append(file)
 
     # Get aggregate data
-    drop_data = build_drop_data(telemetry_files, data_dir)
+    drop_data = build_drop_data(telemetry_files, data_dir, threads)
 
     # Split by map and flight path
     all_data = []
@@ -473,16 +473,19 @@ def split_drop_data_by_map(drop_data):
     map_data = []
     for game_map in drop_data['map'].unique():
         map_data.append(drop_data[drop_data['map'] == game_map])
+    if not map_data:
+        logging.error("Got empty result when attempting to split data by map")
     return map_data
 
 
 # Split the drop data (assumed to already be split by map) by flight path
 def split_drop_data_by_flight_path(drop_data):
+    map_data = []
     flight_data = []
-    print(drop_data.columns)
     for flight in drop_data['flight_path'].unique():
         flight_data.append(drop_data[drop_data['flight_path'] == flight])
-    print(len(flight_data))
+    if not flight_data:
+        logging.error("Got empty result when attempting to split data by flight path")
     return flight_data
 
 
@@ -503,13 +506,18 @@ def main():
     parser = argparse.ArgumentParser("Parses PUBG match data")
     parser.add_argument('--downloaddir')
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--threads', type=int)
     args = parser.parse_args()
     download_directory = "data/"
     if args.downloaddir is not None:
         download_directory = args.downloaddir
+    threads = os.cpu_count()
+    if args.threads is not None:
+        threads = int(args.threads)
     downloader.setup_logging(args.debug)
+    logging.info("Initialized parser")
 
-    drop_data = get_drop_data(download_directory)
+    drop_data = get_drop_data(download_directory, threads)
     logging.info("Drop data loaded")
     # for df in drop_data:
     #     print("\n", df.iloc[0][['map', 'flight_path']], " - ", df.shape[0], )
@@ -531,8 +539,7 @@ def main():
     for i in range(len(drop_data)):
         df = drop_data[i]
         df = df[df["rank"] <= 10]
-        print(df)
-        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
+        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])  # Split x and y tuple (ignore warning)
         df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
         drop_data[i] = df
 
@@ -552,7 +559,7 @@ def main():
     rec.train_model(temp, 20)
     for df in drop_data:
         rec.train_model(preprocess_data(df), 20)
-    drop_data = drop_data.dropna()
+    # drop_data = drop_data.dropna()
     rec.train_model(drop_data, 20)
     a = np.array(['a', 'b', 'f', 'd'])
     b = np.array(['f', 'b', 'e', 'd'])
