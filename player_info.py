@@ -3,6 +3,8 @@ import downloader
 from data_visualization import display_player_paths
 import logging
 import os
+from math import sqrt, pi, cos, sin
+from random import random
 import pandas as pd
 import numpy as np
 from pandas.io.json import json_normalize
@@ -74,9 +76,19 @@ def join_player_and_zone(player_paths, zone_info):
     player_paths['x_'] = player_paths['x'].apply(round_raw)
     player_paths['y_'] = player_paths['y'].apply(round_raw)
     player_paths.drop(['x', 'y'], axis=1, inplace=True)
+    zone_info.drop(['safetyZonePosition_x', 'safetyZonePosition_y', 'safetyZoneRadius'], axis=1, inplace=True)
 
     joined_df = (player_paths.set_index("game_state").join(zone_info.set_index("isGame"))
                  .drop("index", axis=1).reset_index())
-    joined_df.columns = ["gameState" if col == "index" else col for col in joined_df.columns]
+    joined_df.columns = joined_df.columns.map({"index" : "gameState",
+                                               "name": "name",
+                                               "x_": "x",
+                                               "y_": "y",
+                                               "ranking": "ranking",
+                                               "poisonGasWarningPosition_x": "safe_x",
+                                               "poisonGasWarningPosition_y": "safe_y",
+                                               "poisonGasWarningRadius": "safe_r"
+                                               })
 
     return joined_df
+
