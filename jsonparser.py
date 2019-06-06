@@ -215,6 +215,14 @@ def get_flight_category(flight_vector):
     return dirs_df['direction'].loc[dirs_df['angle_from_path'].idxmin()]
 
 
+def get_flight_cat_from_telemetry(telemetry):
+    first, last = get_flight_data(telemetry)
+    if first is not None and last is not None:
+        vec = get_flight_vector(first, last)
+        return get_flight_category(vec)
+    else:
+        return None
+
 # Convert raw (x, y) coordinates to the category
 # Maps are divided into a 20x20 grid of square_size x square_size blocks
 # where each square can be represented by a letter for the x and y position of that
