@@ -381,7 +381,7 @@ def train_models(map_data):
 
     return models
 
-
+# get_drop_data_by_map should be called before this
 def train_models_drop_locations(drop_data):
     '''
     writes trains and writes drop data dataframe to a file
@@ -399,6 +399,7 @@ def train_models_drop_locations(drop_data):
         model = train_model(df, 20)
         logging.debug("SAVING MODEL TO PATH " + filepath)
         joblib.dump(model, filepath)
+
 
 if __name__ == "__main__":
     data_dir = "./data/"
