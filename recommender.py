@@ -1,6 +1,7 @@
+from sklearn.externals import joblib
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split, cross_val_score, cross_validate, KFold
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder, StandardScaler, OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction import DictVectorizer
 
@@ -108,13 +109,26 @@ def get_next_loc(game_state, x, y, safe_x, safe_y, safe_r, model):
         return get_closest_to_safezone(x, y, safe_x, safe_y, safe_r)
 
     winning_locs = []
+    ranks = {0: [], 1: [], 2: [], 3: [], 4: []}
     for cand_x, cand_y in candidates:
         rank = predict_rank(game_state, cand_x, cand_y, safe_x, safe_y, safe_r, model)
-        if rank == 1:
-            winning_locs.append((cand_x, cand_y))
+        ranks[rank].append((cand_x, cand_y))
 
-    if len(winning_locs) > 0:
-        return winning_locs[randint(0, len(winning_locs) - 1)]
+    if len(ranks[0]) > 0:
+        print("NEXT LOC RANK 0")
+        return ranks[0][randint(0, len(ranks[0]) - 1)]
+    elif len(ranks[1]) > 0:
+        print("NEXT LOC RANK 1")
+        return ranks[1][randint(0, len(ranks[1]) - 1)]
+    elif len(ranks[2]) > 0:
+        print("NEXT LOC RANK 2")
+        return ranks[2][randint(0, len(ranks[2]) - 1)]
+    elif len(ranks[3]) > 0:
+        print("NEXT LOC RANK 3")
+        return ranks[3][randint(0, len(ranks[3]) - 1)]
+    elif len(ranks[4]) > 0:
+        print("NEX LOC RANK 4")
+        return ranks[4][randint(0, len(ranks[4]) - 1)]
     else:
         return -1, -1
 
@@ -187,6 +201,7 @@ def gen_path(drop_x, drop_y, possible_safe_zones, end_state, model):
 
         if curr_x == -1 and curr_y == -1:   # No candidate locations were predicted to be winning locations, path ends
             game_state = end_state
+            print("NO WINNING MOVES - YOU DIED")
         else:
             # Add to path
             path.append({"x": curr_x, "y": curr_y,
@@ -208,76 +223,26 @@ def gen_path(drop_x, drop_y, possible_safe_zones, end_state, model):
 # additionally, I am assuming that the list has already been filtered(ie. we are only training on the top players)
 # additionally, my current assumption is the data has already been transformed into non-categorical data
 def train_model(df, max_k):
-    x = df.iloc[:, :-1].copy()  # assuming our target is at the very end of the dataframe
-    y = df.iloc[:, -1].copy()
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2)
-    x_train = scale(x_train)
-    x_test = scale(x_test)
-    k_scores = []
-    for k in range(1, max_k):
-        knn = KNeighborsClassifier(n_neighbors=k)
-        cv_scores = cross_val_score(knn, x_train, y_train, cv=10, scoring='accuracy')
-        k_scores.append(cv_scores.mean())
-
-    max_score = max(k_scores)
-
-    #  get the arg max of the score array to determine the optimal value for k
-    k_opt = None
-    for i in range(len(k_scores)):
-        if k_scores[i] == max_score:
-            k_opt = i + 1
-
-    knn = KNeighborsClassifier(n_neighbors=k_opt)
-    kf = KFold(n_splits=10)
-
-    # split the training data into different validation folds and run a training loop on it
-
-    kf.get_n_splits(x_train)
-    training_scores = []
-
-    knn.fit(x_train, y_train)  # we get about -2.something places per map accuracy
-    # testing_accuracy = (knn.predict(x_test) - y_test).mean()
-
-    predictions = knn.predict(x_test)
-    correct_predictions = predictions[predictions == y_test]
-
-    print("TESTING ACCURACY: ", len(correct_predictions) / len(predictions))
-    return knn
-
-
-def player_path_model(df, max_k):
-    # TODO: get x and y from df
-
-    # Zone Data
-    x = None
-
-    # Player Position Category
-    y = None
-
-    best_score = 0
+    x = df[['x_drop_loc_raw', 'y_drop_loc_raw']]
+    y = df['success_category']
+    # x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2)
+    best_score = 0.0
     best_model = None
-
-    # Hyperparameter Tuning
-    for k in range(max_k):
-        vec = DictVectorizer(sparse=False)
+    for k in range(1, max_k):
         scaler = StandardScaler()
         model = KNeighborsClassifier(n_neighbors=k)
-        pipeline = Pipeline([('vec', vec),
-                             ('scaler', scaler),
+        pipeline = Pipeline([('scaler', scaler),
                              ('fit', model)])
+        score = cross_val_score(pipeline, x, y, cv=5, scoring='accuracy').mean()
 
-        score = cross_val_score(pipeline,
-                                x,
-                                y,
-                                cv=5, scoring='accuracy').mean()
+
 
         if score > best_score or best_model is None:
             best_score = score
             best_model = pipeline
-
-    print("Best Accuracy Score: " + str(best_score))
+        print("Best Accuracy Score: " + str(best_score))
+        # return best_model
     return best_model
-
 
 # preprocess the dataframe
 def preprocess_data(drop_data):
@@ -333,11 +298,31 @@ def tune_player_path_model(position_df, max_k):
     print("Best Accuracy Score: " + str(best_score))
     return best_model
 
-def ranking_to_bin(ranking):
-    if ranking >= 5:
-        return 1
-    else:
-        return 0
+def get_drop_data_by_map(drop_data):
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
+        df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
+        drop_data[i] = df
+
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df.drop(columns=['drop_loc_raw'])
+
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        rank_range = df["rank"].max() - df["rank"].min()
+        df["success_category"] = df["rank"].apply(ranking_to_bin, args=(rank_range,))
+        drop_data[i] = df
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
+        drop_data[i] = df
+def ranking_to_bin(ranking, rank_range):
+    rank_bin = (ranking - 1) // (rank_range // 5)
+    if rank_bin == 5:   # Range doesn't divide into 5 evenly, so there will be a 6th bin, need to add to 5th instead
+        rank_bin = 4
+    return rank_bin
 
 
 def get_map_data(telemetry_files):
@@ -360,10 +345,12 @@ def get_map_data(telemetry_files):
             player_loc_info = player_info.get_player_paths(telemetry)
             zone_info = jsonparser.getZoneStates(telemetry)
             combined = player_info.join_player_and_zone(player_loc_info, zone_info).dropna()
-            combined["ranking"] = combined["ranking"].apply(ranking_to_bin)
+            rank_range = combined["ranking"].max() - combined["ranking"].min()
+            combined["ranking"] = combined["ranking"].apply(ranking_to_bin, args=(rank_range,))
+            print(combined["ranking"].value_counts())
             print("MAX STATE: ", combined['gameState'].max())
 
-            if (map_name, flight_cat) not in map_data.keys():
+            if (map_name, flight_cat) not in map_data.keys( ):
                 map_data[(map_name, flight_cat)] = []
             map_data[(map_name, flight_cat)].append(combined.dropna())
 
@@ -390,15 +377,34 @@ def train_models(map_data):
 
         models[key] = optimal
 
-        with open(".\\models\\{}_{}-model.pickle".format(key[0], key[1]), "wb") as model_f:
+        with open("./models/{}_{}-model.pickle".format(key[0], key[1]), "wb") as model_f:
             pickle.dump(optimal, model_f)
             model_f.close()
 
     return models
 
+# get_drop_data_by_map should be called before this
+def train_models_drop_locations(drop_data, max_k):
+    '''
+    writes trains and writes drop data dataframe to a file
+    :param drop_data: array[dataframe] for all map, flight path drop data
+    :return: void
+    '''
+    for i in range(len(drop_data)):
+        df = drop_data[i]
+        mapName = df.iloc[0]['map']
+        flight_direction = df.iloc[0]['flight_path']
+        if mapName == 'Savage_Main':
+            filepath = "model_" + mapName + ".pkl"
+        else:
+            filepath = "model_" + mapName + "_" + flight_direction + ".pkl"
+        model = train_model(df, max_k)
+        logging.debug("SAVING MODEL TO PATH " + filepath)
+        joblib.dump(model, filepath)
+
 
 if __name__ == "__main__":
-    data_dir = ".\\data\\"
+    data_dir = "./data/"
     match_files = []
     telemetry_files = []
 
@@ -412,6 +418,12 @@ if __name__ == "__main__":
             logging.debug("Telemetry file %s found, adding as match", file)
             telemetry_files.append(file)
 
+    # this trains the models for predictiing drop locations
+    drop_data = jsonparser.get_drop_data(data_dir)
+    get_drop_data_by_map(drop_data)
+    train_models_drop_locations(drop_data, 20)
+
+
     # Just a test telemetry object
     t = jsonparser.load_pickle(data_dir + telemetry_files[0])
     zone_info = jsonparser.getZoneStates(t)
@@ -420,6 +432,9 @@ if __name__ == "__main__":
                                                  "safetyZonePosition_y": "y",
                                                  "safetyZoneRadius": "radius"})
 
+    #data = get_map_data(telemetry_files[:5])
+    #models = train_models(data)
+    #
     # Get map name, flight path, and location info from telemetry
     map_n = jsonparser.get_map(t)
     fp = jsonparser.get_flight_cat_from_telemetry(t)
@@ -427,7 +442,7 @@ if __name__ == "__main__":
     total = player_info.join_player_and_zone(drop, zone_info)
 
     # Load the model (NOTE, must have pickled models that are fit to the data already)
-    model = jsonparser.load_pickle(".\\models\\Savage_Main_nn-model.pickle")
+    model = jsonparser.load_pickle("./models/Savage_Main_nn-model.pickle")
 
     # Get a random location to use as the drop location
     total.dropna(inplace=True)
@@ -435,7 +450,7 @@ if __name__ == "__main__":
     x_ = rand_pos['x'].values[0].item()
     y_ = rand_pos['y'].values[0].item()
     print(x_, y_)
-
+    #
     # Generate a path (DataFrame)
     path = gen_path(int(x_), int(y_), blue_zones, 8.5, model)
     print(path)
@@ -443,4 +458,4 @@ if __name__ == "__main__":
     # Display the path
     data_visualization.display_player_path(pd.DataFrame(path), None, map_n)
 
-
+    # """
