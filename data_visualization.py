@@ -102,8 +102,49 @@ def display_drop_locations_by_prediction(player_data):
         map_img = imread("vikendi.png")
         plt.imshow(map_img, zorder=0, extent=[0.0, 6.0, 0.0, 6.0])
 
+def make_circle(safe):
+    x_ = safe["safe_x"] / jsp.CM_TO_KM
+    y_ = safe["safe_y"] / jsp.CM_TO_KM
+    r_ = safe["safe_r"] / jsp.CM_TO_KM
+    return plt.Circle((x_, y_), r_, color="midnightblue", alpha=0.75, fill=False)
 
-def display_player_path(paths_df, blue_zones, map_name):
+
+def display_map_grid(map_name):
+    if map_name == "Savage_Main":  # 4km map
+        x_max = jsp.MAX_MAP_SIZE * (1 / 2)
+        y_max = x_max
+        map_img = imread("savage.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 4.0, 0.0, 4.0])
+    elif map_name == "Erangel_Main":  # 8km map
+        x_max = jsp.MAX_MAP_SIZE
+        y_max = jsp.MAX_MAP_SIZE
+        map_img = imread("erangel2.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
+    elif map_name == "Desert_Main":  # 8km map
+        x_max = jsp.MAX_MAP_SIZE
+        y_max = x_max
+        map_img = imread("miramar2.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
+    elif map_name == "DihorOtok_Main":  # 6km map
+        x_max = jsp.MAX_MAP_SIZE * (3 / 4)
+        y_max = x_max
+        map_img = imread("vikendi.png")
+        plt.imshow(map_img, zorder=0, extent=[0.0, 6.0, 0.0, 6.0])
+
+    plt.ylim(0, y_max)
+    plt.xlim(0, x_max)
+    plt.xlabel('km')
+    plt.ylabel('km')
+    plt.minorticks_on()
+    plt.grid(b=True, which='major', c='grey', alpha=0.5, linestyle='-')
+    plt.grid(b=True, which='minor', c='grey', alpha=0.5, linestyle='-')
+    plt.title(map_name)
+
+    plt.show()
+
+
+
+def display_player_path(paths_df, map_name):
     #TODO Blue zone display
 
     if map_name == "Savage_Main":  # 4km map
@@ -114,7 +155,7 @@ def display_player_path(paths_df, blue_zones, map_name):
     elif map_name == "Erangel_Main":  # 8km map
         x_max = jsp.MAX_MAP_SIZE
         y_max = jsp.MAX_MAP_SIZE
-        map_img = imread("erangel.png")
+        map_img = imread("erangel2.png")
         plt.imshow(map_img, zorder=0, extent=[0.0, 8.0, 0.0, 8.0])
     elif map_name == "Desert_Main":  # 8km map
         x_max = jsp.MAX_MAP_SIZE
@@ -134,7 +175,14 @@ def display_player_path(paths_df, blue_zones, map_name):
     end_x = paths_after_drop.iat[paths_after_drop.index[-1]-1, paths_after_drop.columns.get_loc("x")]
     end_y = paths_after_drop.iat[paths_after_drop.index[-1]-1, paths_after_drop.columns.get_loc("y")]
 
-    plt.plot(paths_after_drop['x'] / jsp.CM_TO_KM, paths_after_drop['y'] / jsp.CM_TO_KM)
+    circles = paths_df[["safe_x", "safe_y", "safe_r"]].apply(make_circle, axis=1)
+
+    ax = plt.gca()
+
+    for circle in circles:
+        ax.add_artist(circle)
+
+    plt.plot(paths_after_drop['x'] / jsp.CM_TO_KM, paths_after_drop['y'] / jsp.CM_TO_KM, color="black", alpha=0.75)
     plt.plot(drop_x / jsp.CM_TO_KM, drop_y / jsp.CM_TO_KM, 'o', color="green", zorder=1)
     plt.plot(end_x / jsp.CM_TO_KM, end_y / jsp.CM_TO_KM, 'x', color="red", zorder=1)
 
@@ -148,3 +196,8 @@ def display_player_path(paths_df, blue_zones, map_name):
     plt.title(map_name)
 
     plt.show()
+
+if __name__ == "__main__":
+    for map in ["Savage_Main", "Erangel_Main", "Desert_Main", "DihorOtok_Main"]:
+        display_map_grid(map)
+
