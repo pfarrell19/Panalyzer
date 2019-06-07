@@ -424,7 +424,6 @@ if __name__ == "__main__":
     train_models_drop_locations(drop_data, 20)
 
 
-    # todo: uncomment below before commit
     # Just a test telemetry object
     t = jsonparser.load_pickle(data_dir + telemetry_files[0])
     zone_info = jsonparser.getZoneStates(t)
