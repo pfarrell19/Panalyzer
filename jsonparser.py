@@ -470,27 +470,7 @@ def get_drop_data(data_dir):
 
     return all_data
 
-def get_drop_data_by_map(drop_data):
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df = df[df["rank"] <= 10]
-        print(df)
-        df['x_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[0])
-        df['y_drop_loc_raw'] = df['drop_loc_raw'].apply(lambda x: x[1])
-        drop_data[i] = df
 
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df = df.drop(columns=['drop_loc_raw'])
-
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df['success_category'] = df['rank'].apply(success_category)
-        drop_data[i] = df
-    for i in range(len(drop_data)):
-        df = drop_data[i]
-        df = df.drop(columns=["drop_loc_cat", "drop_loc_raw", "player", "rank"])
-        drop_data[i] = df
 # Split the DataFrame containing all of the drop data into separate DataFrames for each map
 def split_drop_data_by_map(drop_data):
     map_data = []
