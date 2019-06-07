@@ -1,3 +1,5 @@
+import logging
+
 import jsonparser as jsp
 import matplotlib.pyplot as plt
 from imageio import imread

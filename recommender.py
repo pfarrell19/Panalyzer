@@ -17,6 +17,8 @@ from math import sqrt, pi, cos, sin, atan2
 from random import random, randint
 import pandas as pd
 import numpy as np
+import constants
+import random
 
 
 def in_zone(x, y, zone_x, zone_y, zone_r):
@@ -241,6 +243,7 @@ def train_model(df, max_k):
             best_score = score
             best_model = pipeline
         print("Best Accuracy Score: " + str(best_score))
+    best_model.fit(x, y)
         # return best_model
     return best_model
 
@@ -395,12 +398,93 @@ def train_models_drop_locations(drop_data, max_k):
         mapName = df.iloc[0]['map']
         flight_direction = df.iloc[0]['flight_path']
         if mapName == 'Savage_Main':
-            filepath = "model_" + mapName + ".pkl"
+            filepath = "./drop_models/model_" + mapName + ".pkl"
         else:
-            filepath = "model_" + mapName + "_" + flight_direction + ".pkl"
+            filepath = "./drop_models/model_" + mapName + "_" + flight_direction + ".pkl"
         model = train_model(df, max_k)
         logging.debug("SAVING MODEL TO PATH " + filepath)
         joblib.dump(model, filepath)
+
+
+def get_map_constraints(mapName):
+    '''
+
+    :param mapName: String
+    :return: tuple(:min_x: int, :max_x: int, :min_y: int, :max_y: int)
+    '''
+    if mapName == 'Desert_Main':
+        return (constants.DESERT_MIN_X, constants.DESERT_MAX_X, constants.DESERT_MIN_Y, constants.DESERT_MAX_Y)
+    elif mapName == 'Erangel_Main':
+        return (constants.ERANGEL_MIN_X, constants.ERANGEL_MAX_X, constants.ERANGEL_MIN_Y, constants.ERANGEL_MAX_Y)
+    elif mapName == 'DihorOtok_Main':
+        return (constants.DIHOROTOK_MIN_X, constants.DIHOROTOK_MAX_X, constants.ERANGEL_MIN_Y, constants.ERANGEL_MAX_Y)
+    else:
+        assert(mapName == 'Savage_Main')
+        return (constants.SAVAGE_MIN_X, constants.SAVAGE_MAX_X, constants.SAVAGE_MIN_Y, constants.SAVAGE_MAX_Y)
+
+def get_drop_predictions(mapName, flight_path, model):
+    '''
+
+    :param mapName: String
+    :param flight_path: String
+    :param model: sklearn Pipeline
+    :return: void
+
+    writes to a csv file for the best predicted drop locations
+    '''
+
+    min_x, max_x, min_y, max_y = get_map_constraints(mapName)
+    locations = {'x_location': [], 'y_location': []}
+    # find the best drop locations
+    for x in range(min_x, max_x + 1, constants.DROP_MAP_INCREMENT):
+        for y in range(min_y, max_y + 1, constants.DROP_MAP_INCREMENT):
+            locations['x_location'].append(x)
+            locations['y_location'].append(y)
+
+    locations = pd.DataFrame(locations)
+    predicted_ranks = model.predict(locations)
+    locations['predicted_rank'] = predicted_ranks
+    best_predicted_rank = min(predicted_ranks)
+
+    locations = locations[locations['predicted_rank'] == best_predicted_rank]
+
+    # create a dataframe of the best drop locations and then write to a csv
+    if mapName != "Savage_Main":
+        csv_file_path = "./drop_locations/drop_" + mapName + "_" + flight_path + ".csv"
+    else:
+        csv_file_path = "./drop_locations/drop_" + mapName + ".csv"
+    locations.to_csv(csv_file_path)
+    print("predictions for flight_path " + flight_path + " for map " + mapName + " written to " + csv_file_path)
+
+
+def get_best_drop_location(mapName, flight_path):
+    '''
+
+    :param mapName: string
+    :param flight_path: string
+    :return: tuple(:x: int, :y: int)
+
+    given a map name and flight direction returns an optimal drop location
+    '''
+
+    file_path = './drop_locations'
+
+    if mapName == 'Savage_Main':
+        file_path = file_path + '/' + 'drop_' + mapName + '.csv'
+    else:
+        file_path = file_path + '/' + 'drop_' + mapName + '_' + flight_path + '.csv'
+
+    df = pd.read_csv(file_path)
+    index = random.randint(0, len(df) - 1)
+
+    optimal_location = df.iloc[index]
+    x = optimal_location['x_location']
+    y = optimal_location['y_location']
+
+
+    return (x, y)
+
+
 
 
 if __name__ == "__main__":
@@ -418,6 +502,9 @@ if __name__ == "__main__":
             logging.debug("Telemetry file %s found, adding as match", file)
             telemetry_files.append(file)
 
+
+
+
     # this trains the models for predictiing drop locations
     drop_data = jsonparser.get_drop_data(data_dir)
     get_drop_data_by_map(drop_data)
@@ -425,37 +512,37 @@ if __name__ == "__main__":
 
 
     # Just a test telemetry object
-    t = jsonparser.load_pickle(data_dir + telemetry_files[0])
-    zone_info = jsonparser.getZoneStates(t)
-    blue_zones = zone_info[["safetyZonePosition_x", "safetyZonePosition_y", "safetyZoneRadius"]]
-    blue_zones.columns = blue_zones.columns.map({"safetyZonePosition_x": "x",
-                                                 "safetyZonePosition_y": "y",
-                                                 "safetyZoneRadius": "radius"})
-
-    #data = get_map_data(telemetry_files[:5])
-    #models = train_models(data)
+    # t = jsonparser.load_pickle(data_dir + telemetry_files[0])
+    # zone_info = jsonparser.getZoneStates(t)
+    # blue_zones = zone_info[["safetyZonePosition_x", "safetyZonePosition_y", "safetyZoneRadius"]]
+    # blue_zones.columns = blue_zones.columns.map({"safetyZonePosition_x": "x",
+    #                                              "safetyZonePosition_y": "y",
+    #                                              "safetyZoneRadius": "radius"})
     #
-    # Get map name, flight path, and location info from telemetry
-    map_n = jsonparser.get_map(t)
-    fp = jsonparser.get_flight_cat_from_telemetry(t)
-    drop = player_info.get_player_paths(t)
-    total = player_info.join_player_and_zone(drop, zone_info)
-
-    # Load the model (NOTE, must have pickled models that are fit to the data already)
-    model = jsonparser.load_pickle("./models/Savage_Main_nn-model.pickle")
-
-    # Get a random location to use as the drop location
-    total.dropna(inplace=True)
-    rand_pos = total.sample(n=1)
-    x_ = rand_pos['x'].values[0].item()
-    y_ = rand_pos['y'].values[0].item()
-    print(x_, y_)
+    # #data = get_map_data(telemetry_files[:5])
+    # #models = train_models(data)
+    # #
+    # # Get map name, flight path, and location info from telemetry
+    # map_n = jsonparser.get_map(t)
+    # fp = jsonparser.get_flight_cat_from_telemetry(t)
+    # drop = player_info.get_player_paths(t)
+    # total = player_info.join_player_and_zone(drop, zone_info)
     #
-    # Generate a path (DataFrame)
-    path = gen_path(int(x_), int(y_), blue_zones, 8.5, model)
-    print(path)
-
-    # Display the path
-    data_visualization.display_player_path(pd.DataFrame(path), None, map_n)
+    # # Load the model (NOTE, must have pickled models that are fit to the data already)
+    # model = jsonparser.load_pickle("./models/Savage_Main_nn-model.pickle")
+    #
+    # # Get a random location to use as the drop location
+    # total.dropna(inplace=True)
+    # rand_pos = total.sample(n=1)
+    # x_ = rand_pos['x'].values[0].item()
+    # y_ = rand_pos['y'].values[0].item()
+    # print(x_, y_)
+    # #
+    # # Generate a path (DataFrame)
+    # path = gen_path(int(x_), int(y_), blue_zones, 8.5, model)
+    # print(path)
+    #
+    # # Display the path
+    # data_visualization.display_player_path(pd.DataFrame(path), None, map_n)
 
     # """
