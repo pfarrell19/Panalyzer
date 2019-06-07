@@ -42,6 +42,7 @@ def main():
     if drop:
         #TODO: Input data format; current assumption -> pickle df
         dropInput = pickle.load(dropInputFile)
+        flight_direction = dropInput.iloc["flight_"]
         modelDrop = pickle.load('''model''')
         dropPrediction = predict(modelDrop, dropInput)
         print ("Suggested Drop Location: {!r}".format(dropPrediction))
