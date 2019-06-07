@@ -48,7 +48,7 @@ def main():
     if args.threads is not None:
         download_threads = int(args.threads)
     setup_logging(args.debug)
-    logging.debug("Using %i threads to download PUBG data", download_threads)
+    logging.info("Using %i threads to download PUBG data", download_threads)
 
     # Get API keys
     logging.debug("Getting API keys from file %s", api_keys_filename)
@@ -121,6 +121,7 @@ def handle_telemetry(telemetry_queue, download_directory, download_count):
             telemetry_file_name = download_directory + match_object.match_id + "_telemetry.pickle"
             write_pickle(match_file_name, match_object)
             write_pickle(telemetry_file_name, parsed_telemetry)
+            logging.info("Saved match id %s", match_object.match_id)
 
 
 def setup_logging(show_debug):
