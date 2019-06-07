@@ -135,6 +135,33 @@
     
 
 
+    <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#circleCenter -->
+
+    <owl:ObjectProperty rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#circleCenter">
+        <rdfs:domain rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Zone"/>
+        <rdfs:range rdf:resource="http://webprotege.stanford.edu/Location"/>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#circleProgression -->
+
+    <owl:ObjectProperty rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#circleProgression">
+        <rdfs:domain rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Zone"/>
+        <rdfs:range rdf:resource="http://webprotege.stanford.edu/Match_Stage"/>
+    </owl:ObjectProperty>
+
+
+
+    <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#determinedBy -->
+
+    <owl:ObjectProperty rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#determinedBy">
+        <rdfs:domain rdf:resource="http://webprotege.stanford.edu/Match_Stage"/>
+        <rdfs:range rdf:resource="http://webprotege.stanford.edu/Map"/>
+    </owl:ObjectProperty>
+
+
+
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#hasLocation -->
 
     <owl:ObjectProperty rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#hasLocation">
@@ -372,6 +399,15 @@
     
 
 
+    <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#occuredAt -->
+
+    <owl:DatatypeProperty rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#occuredAt">
+        <rdfs:domain rdf:resource="http://webprotege.stanford.edu/Match_Stage"/>
+        <rdfs:domain rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Zone"/>
+    </owl:DatatypeProperty>
+
+
+
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#parachuteDistance -->
 
     <owl:DatatypeProperty rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#parachuteDistance">
@@ -539,7 +575,23 @@
         <rdfs:subClassOf rdf:resource="http://webprotege.stanford.edu/Entity"/>
         <rdfs:label xml:lang="en-us">Team</rdfs:label>
     </owl:Class>
-    
+
+
+
+    <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#State -->
+
+    <owl:Class rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#State">
+        <rdfs:subClassOf rdf:resource="http://webprotege.stanford.edu/Match"/>
+    </owl:Class>
+
+
+
+    <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Zone -->
+
+    <owl:Class rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Zone">
+        <rdfs:subClassOf rdf:resource="http://webprotege.stanford.edu/Match"/>
+    </owl:Class>
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath -->
@@ -547,7 +599,7 @@
     <owl:Class rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath">
         <rdfs:subClassOf rdf:resource="http://webprotege.stanford.edu/Map"/>
     </owl:Class>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#teamSuccess -->
@@ -582,7 +634,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#DihorOtok_Main">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/Map"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Erangel_Main -->
@@ -590,7 +642,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Erangel_Main">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/Map"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Savage_Main -->
@@ -598,7 +650,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#Savage_Main">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/Map"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#averageGear -->
@@ -612,7 +664,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#ee">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#highDangerLevel -->
@@ -680,7 +732,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#ne">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#nn -->
@@ -688,7 +740,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#nn">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#nw -->
@@ -696,7 +748,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#nw">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#se -->
@@ -704,7 +756,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#se">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#ss -->
@@ -712,7 +764,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#ss">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#strongGear -->
@@ -726,7 +778,7 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#sw">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
+
 
 
     <!-- http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#weakGear -->
@@ -740,10 +792,10 @@
     <owl:NamedIndividual rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#ww">
         <rdf:type rdf:resource="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#flightPath"/>
     </owl:NamedIndividual>
-    
 
 
-    <!-- 
+
+    <!--
     ///////////////////////////////////////////////////////////////////////////////////////
     //
     // General axioms
@@ -989,7 +1041,7 @@
             <rdf:Description rdf:about="http://webprotege.stanford.edu/project/LwSVMBixyiqoVRchqLO7D#ww"/>
         </owl:distinctMembers>
     </rdf:Description>
-    
+
 
 
     <!-- 
