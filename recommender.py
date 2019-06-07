@@ -18,6 +18,7 @@ from random import random, randint
 import pandas as pd
 import numpy as np
 import constants
+import random
 
 
 def in_zone(x, y, zone_x, zone_y, zone_r):
@@ -456,10 +457,32 @@ def get_drop_predictions(mapName, flight_path, model):
     print("predictions for flight_path " + flight_path + " for map " + mapName + " written to " + csv_file_path)
 
 
+def get_best_drop_location(mapName, flight_path):
+    '''
+
+    :param mapName: string
+    :param flight_path: string
+    :return: tuple(:x: int, :y: int)
+
+    given a map name and flight direction returns an optimal drop location
+    '''
+
+    file_path = './drop_locations'
+
+    if mapName == 'Savage_Main':
+        file_path = file_path + '/' + 'drop_' + mapName + '.csv'
+    else:
+        file_path = file_path + '/' + 'drop_' + mapName + '_' + flight_path + '.csv'
+
+    df = pd.read_csv(file_path)
+    index = random.randint(0, len(df) - 1)
+
+    optimal_location = df.iloc[index]
+    x = optimal_location['x_location']
+    y = optimal_location['y_location']
 
 
-
-
+    return (x, y)
 
 
 
@@ -478,6 +501,9 @@ if __name__ == "__main__":
         elif "_telemetry" in file:
             logging.debug("Telemetry file %s found, adding as match", file)
             telemetry_files.append(file)
+
+
+
 
     # this trains the models for predictiing drop locations
     drop_data = jsonparser.get_drop_data(data_dir)
